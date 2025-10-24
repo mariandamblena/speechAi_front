@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useBatches, useCreateBatch, useCreateBatchFromExcel, useAccounts } from '@/services/queries';
+import { useBatches, useCreateBatch, useCreateBatchFromExcel, useAccounts, useDeleteBatch, useToggleBatchStatus } from '@/services/queries';
 import { BatchModel, CreateBatchRequest } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateBatchModal } from '@/components/batches/CreateBatchModal';
 import { BatchDetailModal } from '@/components/batches/BatchDetailModal';
-import { Plus, Search, Filter, Megaphone, CheckCircle2, XCircle, Clock, Pause } from 'lucide-react';
+import { Plus, Search, Filter, Megaphone, CheckCircle2, XCircle, Clock, Pause, Trash2, Play } from 'lucide-react';
 
 export const BatchesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -18,6 +18,8 @@ export const BatchesPage: React.FC = () => {
   const { data: accounts } = useAccounts();
   const createBatchMutation = useCreateBatch();
   const createBatchFromExcelMutation = useCreateBatchFromExcel();
+  const deleteBatchMutation = useDeleteBatch();
+  const toggleBatchStatusMutation = useToggleBatchStatus();
 
   const handleCreateBatch = async (batchData: CreateBatchRequest) => {
     setIsCreating(true);
@@ -146,6 +148,36 @@ export const BatchesPage: React.FC = () => {
     const total = batch.stats.total_contacts;
     const completed = batch.stats.calls_completed + batch.stats.calls_failed;
     return total > 0 ? Math.round((completed / total) * 100) : 0;
+  };
+
+  const handleDeleteBatch = async (batchId: string, batchName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar la campaña "${batchName}"?\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await deleteBatchMutation.mutateAsync({ batchId, deleteJobs: false });
+      alert(`✅ Campaña "${batchName}" eliminada exitosamente`);
+    } catch (error: any) {
+      console.error('Error eliminando campaña:', error);
+      alert(`❌ Error al eliminar campaña: ${error.response?.data?.detail || error.message}`);
+    }
+  };
+
+  const handleToggleBatchStatus = async (batch: BatchModel) => {
+    const newStatus = batch.status === 'RUNNING' ? false : true;
+    const action = newStatus ? 'reanudar' : 'pausar';
+
+    try {
+      await toggleBatchStatusMutation.mutateAsync({ 
+        batchId: batch.batch_id, 
+        isActive: newStatus 
+      });
+      // No need to show alert, the UI will update automatically due to query invalidation
+    } catch (error: any) {
+      console.error(`Error al ${action} campaña:`, error);
+      alert(`❌ Error al ${action} campaña: ${error.response?.data?.detail || error.message}`);
+    }
   };
 
   if (isLoading) {
@@ -375,20 +407,33 @@ export const BatchesPage: React.FC = () => {
                             Ver Detalle
                           </Button>
                           {batch.status === 'RUNNING' && (
-                            <Button size="sm" variant="warning">
-                              Pausar
-                            </Button>
+                            <button
+                              onClick={() => handleToggleBatchStatus(batch)}
+                              disabled={toggleBatchStatusMutation.isPending}
+                              title="Pausar campaña"
+                              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Pause className="h-4 w-4" />
+                            </button>
                           )}
                           {batch.status === 'PAUSED' && (
-                            <Button size="sm" variant="primary">
-                              Reanudar
-                            </Button>
+                            <button
+                              onClick={() => handleToggleBatchStatus(batch)}
+                              disabled={toggleBatchStatusMutation.isPending}
+                              title="Reanudar campaña"
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Play className="h-4 w-4" />
+                            </button>
                           )}
-                          {(batch.status === 'PENDING' || batch.status === 'PAUSED') && (
-                            <Button size="sm" variant="danger">
-                              Cancelar
-                            </Button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteBatch(batch.batch_id, batch.name)}
+                            disabled={deleteBatchMutation.isPending}
+                            title="Eliminar campaña"
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

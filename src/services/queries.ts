@@ -242,6 +242,21 @@ export const useUpdateAccount = () => {
   });
 };
 
+// Toggle account status
+export const useToggleAccountStatus = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ accountId, isActive }: { accountId: string; isActive: boolean }) => {
+      const response = await api.patch(`/accounts/${accountId}`, { is_active: isActive });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
+  });
+};
+
 // Get account batches
 export const useAccountBatches = (accountId: string, options?: any) => {
   return useQuery({
@@ -310,6 +325,20 @@ export const useBatch = (batchId: string) => {
       return response.data;
     },
     enabled: !!batchId,
+  });
+};
+
+export const useToggleBatchStatus = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ batchId, isActive }: { batchId: string; isActive: boolean }) => {
+      const response = await api.patch(`/batches/${batchId}`, { is_active: isActive });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+    },
   });
 };
 

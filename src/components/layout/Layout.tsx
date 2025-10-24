@@ -38,19 +38,19 @@ export const Layout: React.FC = () => {
         <div className="px-6">
           <div className="flex justify-between items-center h-16">
             {/* Logo con efecto de iluminación */}
-            <div className="flex items-center space-x-3 group">
+            <div className="flex items-center group">
               <div className="relative">
                 {/* Efecto de iluminación de fondo */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-lg blur-lg opacity-0 group-hover:opacity-70 transition-all duration-500 scale-125"></div>
                 
                 {/* Logo */}
-                <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-2 rounded-lg shadow-md group-hover:shadow-lg transition-all duration-300">
-                  <Phone className="h-5 w-5 text-white relative z-10" />
+                <div className="relative">
+                  <img 
+                    src="/logo.svg" 
+                    alt="SpeechAI Campaign Manager" 
+                    className="h-8 w-auto relative z-10 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
+                  />
                 </div>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">SpeechAI</h1>
-                <p className="text-xs text-gray-500">Campaign Manager</p>
               </div>
             </div>
 

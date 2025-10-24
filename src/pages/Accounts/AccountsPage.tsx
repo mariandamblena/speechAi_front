@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useAccounts, useCreateAccount, useUpdateAccount, useSuspendAccount, useActivateAccount } from '@/services/queries';
+import { useAccounts, useCreateAccount, useUpdateAccount, useSuspendAccount, useActivateAccount, useToggleAccountStatus } from '@/services/queries';
 import { AccountModel } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateAccountModal } from '@/components/accounts/CreateAccountModal';
 import { AccountDetailModal } from '@/components/accounts/AccountDetailModal';
 import { formatNumber, formatCredits, formatMinutes } from '@/utils/format';
+import { Building2, Plus, Pause, Play, CheckCircle2, DollarSign } from 'lucide-react';
 
 export const AccountsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -15,6 +16,7 @@ export const AccountsPage: React.FC = () => {
   const updateAccountMutation = useUpdateAccount();
   const suspendAccountMutation = useSuspendAccount();
   const activateAccountMutation = useActivateAccount();
+  const toggleAccountStatusMutation = useToggleAccountStatus();
 
   const handleCreateAccount = async (accountData: any) => {
     try {
@@ -48,6 +50,31 @@ export const AccountsPage: React.FC = () => {
       await activateAccountMutation.mutateAsync(accountId);
     } catch (error) {
       console.error('Error activating account:', error);
+    }
+  };
+
+  const handleToggleAccountStatus = async (account: AccountModel) => {
+    // Si está ACTIVE -> enviar false (para desactivar/suspender)
+    // Si está SUSPENDED -> enviar true (para activar)
+    const newIsActive = account.status !== 'ACTIVE';
+    const action = newIsActive ? 'activar' : 'suspender';
+
+    console.log('Toggle account status:', {
+      accountId: account.account_id,
+      currentStatus: account.status,
+      newIsActive: newIsActive,
+      action: action
+    });
+
+    try {
+      await toggleAccountStatusMutation.mutateAsync({ 
+        accountId: account.account_id, 
+        isActive: newIsActive 
+      });
+      // No need to show alert, the UI will update automatically
+    } catch (error: any) {
+      console.error(`Error al ${action} cuenta:`, error);
+      alert(`❌ Error al ${action} cuenta: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -92,98 +119,76 @@ export const AccountsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cuentas de Empresa</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900">Cuentas de Empresa</h1>
+          <p className="text-gray-600 mt-2 flex items-center">
+            <Building2 className="h-4 w-4 mr-2" />
             Gestiona las cuentas de tus clientes, créditos y configuraciones
           </p>
         </div>
         <Button 
           variant="primary"
           onClick={() => setShowCreateModal(true)}
+          className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
         >
-          <span className="mr-2">+</span>
-          Nueva Cuenta
+          <Plus className="h-5 w-5" />
+          <span>Nueva Cuenta</span>
         </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600">🏢</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Cuentas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {accounts?.length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total Cuentas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {accounts?.length || 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Building2 className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600">✅</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Activas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {accounts?.filter(acc => acc.status === 'ACTIVE').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Activas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {accounts?.filter(acc => acc.status === 'ACTIVE').length || 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-red-600">⏸️</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Suspendidas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {accounts?.filter(acc => acc.status === 'SUSPENDED').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Suspendidas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {accounts?.filter(acc => acc.status === 'SUSPENDED').length || 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Pause className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-purple-600">💰</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Créditos Totales</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {formatNumber(accounts?.reduce((total, acc) => total + (acc.balance?.credits || 0), 0) || 0)}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Créditos Totales
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {formatNumber(accounts?.reduce((total, acc) => total + (acc.balance?.credits || 0), 0) || 0)}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+              <DollarSign className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
@@ -274,23 +279,23 @@ export const AccountsPage: React.FC = () => {
                           Ver Detalle
                         </Button>
                         {account.status === 'ACTIVE' ? (
-                          <Button 
-                            size="sm" 
-                            variant="danger"
-                            onClick={() => handleSuspendAccount(account.account_id, 'Suspensión manual')}
-                            disabled={suspendAccountMutation.isPending}
+                          <button
+                            onClick={() => handleToggleAccountStatus(account)}
+                            disabled={toggleAccountStatusMutation.isPending}
+                            title="Suspender cuenta"
+                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
                           >
-                            Suspender
-                          </Button>
+                            <Pause className="h-4 w-4" />
+                          </button>
                         ) : account.status === 'SUSPENDED' ? (
-                          <Button 
-                            size="sm" 
-                            variant="primary"
-                            onClick={() => handleActivateAccount(account.account_id)}
-                            disabled={activateAccountMutation.isPending}
+                          <button
+                            onClick={() => handleToggleAccountStatus(account)}
+                            disabled={toggleAccountStatusMutation.isPending}
+                            title="Activar cuenta"
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
                           >
-                            Activar
-                          </Button>
+                            <Play className="h-4 w-4" />
+                          </button>
                         ) : null}
                       </div>
                     </td>
