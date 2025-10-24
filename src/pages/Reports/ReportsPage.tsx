@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { useReports } from '@/services/queries';
+import { useDashboardStats, useBatches } from '@/services/queries';
 import { Button } from '@/components/ui/Button';
+import { 
+  Phone, 
+  TrendingUp, 
+  CheckCircle2, 
+  XCircle, 
+  BarChart3, 
+  Download,
+  Calendar,
+  AlertCircle
+} from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   const [selectedBatch, setSelectedBatch] = useState<string>('');
@@ -9,7 +19,12 @@ export const ReportsPage: React.FC = () => {
     to: '',
   });
 
-  const { data: reports, isLoading, error } = useReports();
+  // Usar datos reales del dashboard y batches
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
+  const { data: batches, isLoading: batchesLoading } = useBatches();
+
+  const isLoading = statsLoading || batchesLoading;
+  const error = statsError;
 
   const handleExportReport = (format: 'csv' | 'excel') => {
     // Implementation for export
@@ -27,30 +42,64 @@ export const ReportsPage: React.FC = () => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">Error al cargar los reportes</p>
+        <div className="flex">
+          <XCircle className="h-5 w-5 text-red-400 mr-2" />
+          <p className="text-red-800">Error al cargar los reportes: {error.toString()}</p>
+        </div>
       </div>
     );
   }
 
+  // Calcular estadísticas desde datos reales
+  const totalCalls = stats?.total_jobs || 0;
+  const successfulCalls = stats?.completed_jobs || 0;
+  const failedCalls = stats?.failed_jobs || 0;
+  const successRate = totalCalls > 0 ? ((successfulCalls / totalCalls) * 100).toFixed(1) : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Reportes y Análisis</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Reportes y Análisis</h1>
+          <p className="text-gray-600 mt-2 flex items-center">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Análisis detallado de tus campañas y llamadas
+          </p>
+        </div>
         <div className="flex space-x-3">
           <Button
             variant="secondary"
             onClick={() => handleExportReport('csv')}
+            className="flex items-center space-x-2"
           >
-            Exportar CSV
+            <Download className="h-4 w-4" />
+            <span>Exportar CSV</span>
           </Button>
           <Button
             variant="primary"
             onClick={() => handleExportReport('excel')}
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
           >
-            Exportar Excel
+            <Download className="h-4 w-4" />
+            <span>Exportar Excel</span>
           </Button>
         </div>
       </div>
+
+      {/* Banner informativo si no hay datos del backend */}
+      {!stats && !isLoading && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Datos de ejemplo</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                No se pudo conectar con el backend. Mostrando datos de ejemplo.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -66,8 +115,11 @@ export const ReportsPage: React.FC = () => {
               className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Todos los lotes</option>
-              <option value="batch-1">Lote 1</option>
-              <option value="batch-2">Lote 2</option>
+              {batches?.map((batch) => (
+                <option key={batch.batch_id} value={batch.batch_id}>
+                  {batch.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -97,90 +149,58 @@ export const ReportsPage: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                </svg>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total de Llamadas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {totalCalls.toLocaleString()}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total de Llamadas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  1,234
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Phone className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Llamadas Exitosas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {successfulCalls.toLocaleString()}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Llamadas Exitosas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  856
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Llamadas Fallidas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {failedCalls.toLocaleString()}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Llamadas Fallidas
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  378
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg">
+              <XCircle className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Tasa de Éxito</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {successRate}%
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Tasa de Éxito
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  69.4%
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+              <TrendingUp className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
@@ -207,11 +227,11 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Detailed table */}
+      {/* Campañas Activas */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
-            Detalle de Llamadas
+            Campañas Activas
           </h3>
         </div>
         <div className="overflow-x-auto">
@@ -219,55 +239,81 @@ export const ReportsPage: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Teléfono
+                  Campaña
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Duración
+                  Contactos
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha
+                  Completadas
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Progreso
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fecha Creación
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {/* Sample data - replace with real data */}
-              {[
-                { cliente: 'Juan Pérez', telefono: '+54 9 11 1234-5678', estado: 'Completada', duracion: '2:45', fecha: '2025-01-03' },
-                { cliente: 'María García', telefono: '+54 9 11 2345-6789', estado: 'Sin respuesta', duracion: '0:30', fecha: '2025-01-03' },
-                { cliente: 'Carlos López', telefono: '+54 9 11 3456-7890', estado: 'Ocupado', duracion: '0:15', fecha: '2025-01-03' },
-              ].map((call, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {call.cliente}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {call.telefono}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      call.estado === 'Completada' 
-                        ? 'bg-green-100 text-green-800'
-                        : call.estado === 'Sin respuesta'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {call.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {call.duracion}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {call.fecha}
+              {batches && batches.length > 0 ? (
+                batches.slice(0, 10).map((batch) => {
+                  const totalContacts = batch.stats?.total_contacts || 0;
+                  const completed = batch.stats?.calls_completed || 0;
+                  const progress = totalContacts > 0 ? Math.round((completed / totalContacts) * 100) : 0;
+                  
+                  return (
+                    <tr key={batch.batch_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{batch.name}</div>
+                        <div className="text-sm text-gray-500">{batch.description || 'Sin descripción'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          batch.status === 'RUNNING' 
+                            ? 'bg-green-100 text-green-800'
+                            : batch.status === 'PAUSED'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : batch.status === 'COMPLETED'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {batch.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {totalContacts}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {completed}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all" 
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-900">{progress}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(batch.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No hay campañas disponibles
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
