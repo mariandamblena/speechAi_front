@@ -1,6 +1,18 @@
 import React from 'react';
 import { useDashboardStats, useBatches } from '@/services/queries';
 import { formatNumber, formatPercentage } from '@/utils/format';
+import { 
+  Phone, 
+  TrendingUp, 
+  Activity, 
+  Clock, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle,
+  DollarSign,
+  Users,
+  Target
+} from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   // Real API queries - will show loading/error states if API is not available
@@ -58,7 +70,7 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <span className="text-yellow-400">⚠️</span>
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">
@@ -77,7 +89,7 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <span className="text-red-400">❌</span>
+              <XCircle className="h-5 w-5 text-red-400" />
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">
@@ -94,85 +106,61 @@ export const DashboardPage: React.FC = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Jobs Today */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600">📞</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Jobs Hoy</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {displayStats?.total_jobs_today ?? 0}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Jobs Hoy
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {displayStats?.total_jobs_today ?? 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Phone className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
         {/* Success Rate */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600">✅</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Tasa de Éxito</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {formatNumber(displayStats?.success_rate ?? 0)}%
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Tasa de Éxito
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {formatNumber(displayStats?.success_rate ?? 0)}%
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-lg">
+              <TrendingUp className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
         {/* Active Batches */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-purple-600">📋</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Lotes Activos</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {displayStats?.active_batches ?? 0}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Lotes Activos
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {displayStats?.active_batches ?? 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Target className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
         {/* Pending Jobs */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                <span className="text-yellow-600">⏳</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Jobs Pendientes</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                {displayStats?.pending_jobs ?? 0}
+              </p>
             </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Jobs Pendientes
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {displayStats?.pending_jobs ?? 0}
-                </dd>
-              </dl>
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Clock className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>

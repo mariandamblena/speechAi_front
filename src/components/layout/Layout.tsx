@@ -2,6 +2,16 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
+import { 
+  LayoutDashboard, 
+  Building2, 
+  Megaphone, 
+  Phone, 
+  BarChart3, 
+  Code2,
+  LogOut,
+  User
+} from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,48 +23,53 @@ export const Layout: React.FC = () => {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-    { name: 'Cuentas', href: '/accounts', icon: '🏢' },
-    { name: 'Campañas', href: '/batches', icon: '📋' },
-    { name: 'Llamadas', href: '/jobs', icon: '📞' },
-    { name: 'Reportes', href: '/reports', icon: '📈' },
-    { name: 'Test API', href: '/test-api', icon: '🔗' },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Cuentas', href: '/accounts', icon: Building2 },
+    { name: 'Campañas', href: '/batches', icon: Megaphone },
+    { name: 'Llamadas', href: '/jobs', icon: Phone },
+    { name: 'Reportes', href: '/reports', icon: BarChart3 },
+    { name: 'Test API', href: '/test-api', icon: Code2 },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="px-4 sm:px-6">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40 backdrop-blur-sm bg-white/95">
+        <div className="px-6">
           <div className="flex justify-between items-center h-16">
             {/* Logo con efecto de iluminación */}
-            <div className="flex items-center group">
+            <div className="flex items-center space-x-3 group">
               <div className="relative">
                 {/* Efecto de iluminación de fondo */}
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 rounded-lg blur-lg opacity-0 group-hover:opacity-70 transition-all duration-500 scale-125"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-lg blur-lg opacity-0 group-hover:opacity-70 transition-all duration-500 scale-125"></div>
                 
                 {/* Logo */}
-                <div className="relative">
-                  <img 
-                    src="/logo.svg" 
-                    alt="SpeechAI Campaign Manager" 
-                    className="h-8 w-auto relative z-10 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
-                  />
+                <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-2 rounded-lg shadow-md group-hover:shadow-lg transition-all duration-300">
+                  <Phone className="h-5 w-5 text-white relative z-10" />
                 </div>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">SpeechAI</h1>
+                <p className="text-xs text-gray-500">Campaign Manager</p>
               </div>
             </div>
 
             {/* User menu */}
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Hola, {user?.name || user?.email}
-              </span>
+              <div className="flex items-center space-x-2 bg-gray-50 rounded-full px-4 py-2 border border-gray-200">
+                <User className="h-4 w-4 text-gray-600" />
+                <span className="text-sm text-gray-700 font-medium">
+                  {user?.name || user?.email}
+                </span>
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={handleLogout}
+                className="flex items-center space-x-2"
               >
-                Cerrar Sesión
+                <LogOut className="h-4 w-4" />
+                <span>Cerrar Sesión</span>
               </Button>
             </div>
           </div>
@@ -63,26 +78,29 @@ export const Layout: React.FC = () => {
 
       <div className="flex">
         {/* Sidebar */}
-        <nav className="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
+        <nav className="w-64 bg-white/80 backdrop-blur-sm shadow-sm border-r border-gray-200 min-h-[calc(100vh-4rem)] sticky top-16">
           <div className="p-4">
-            <ul className="space-y-2">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <NavLink
-                    to={item.href}
-                    className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        isActive
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                      }`
-                    }
-                  >
-                    <span className="mr-3">{item.icon}</span>
-                    {item.name}
-                  </NavLink>
-                </li>
-              ))}
+            <ul className="space-y-1">
+              {navigation.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.name}>
+                    <NavLink
+                      to={item.href}
+                      className={({ isActive }) =>
+                        `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        }`
+                      }
+                    >
+                      <Icon className="mr-3 h-5 w-5" />
+                      {item.name}
+                    </NavLink>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </nav>

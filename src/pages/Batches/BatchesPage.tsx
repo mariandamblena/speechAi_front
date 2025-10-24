@@ -4,6 +4,7 @@ import { BatchModel, CreateBatchRequest } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateBatchModal } from '@/components/batches/CreateBatchModal';
 import { BatchDetailModal } from '@/components/batches/BatchDetailModal';
+import { Plus, Search, Filter, Megaphone, CheckCircle2, XCircle, Clock, Pause } from 'lucide-react';
 
 export const BatchesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -168,17 +169,19 @@ export const BatchesPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campañas de Llamadas</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900">Campañas de Llamadas</h1>
+          <p className="text-gray-600 mt-2 flex items-center">
+            <Megaphone className="h-4 w-4 mr-2" />
             Gestiona tus campañas de llamadas automatizadas y su configuración
           </p>
         </div>
         <Button 
           variant="primary"
           onClick={() => setShowCreateModal(true)}
+          className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
         >
-          <span className="mr-2">+</span>
-          Nueva Campaña
+          <Plus className="h-5 w-5" />
+          <span>Nueva Campaña</span>
         </Button>
       </div>
 
@@ -204,102 +207,72 @@ export const BatchesPage: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600">📋</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {batches?.length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {batches?.length || 0}
-                </dd>
-              </dl>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+              <Megaphone className="h-5 w-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600">▶️</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">En Ejecución</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {batches?.filter(b => b.status === 'RUNNING').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  En Ejecución
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {batches?.filter(b => b.status === 'RUNNING').length || 0}
-                </dd>
-              </dl>
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                <span className="text-yellow-600">⏸️</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Pausados</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {batches?.filter(b => b.status === 'PAUSED').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Pausados
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {batches?.filter(b => b.status === 'PAUSED').length || 0}
-                </dd>
-              </dl>
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+              <Pause className="h-5 w-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600">✅</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Completados</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {batches?.filter(b => b.status === 'COMPLETED').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Completados
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {batches?.filter(b => b.status === 'COMPLETED').length || 0}
-                </dd>
-              </dl>
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-red-600">❌</span>
-              </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Con Error</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {batches?.filter(b => b.status === 'ERROR').length || 0}
+              </p>
             </div>
-            <div className="ml-5">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Con Error
-                </dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {batches?.filter(b => b.status === 'ERROR').length || 0}
-                </dd>
-              </dl>
+            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-white" />
             </div>
           </div>
         </div>
