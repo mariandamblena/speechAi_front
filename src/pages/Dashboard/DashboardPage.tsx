@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDashboardStats, useBatches } from '@/services/queries';
+import { formatNumber, formatPercentage } from '@/utils/format';
 
 export const DashboardPage: React.FC = () => {
   // Real API queries - will show loading/error states if API is not available
@@ -21,7 +22,7 @@ export const DashboardPage: React.FC = () => {
   };
 
   // Use real data if available, otherwise use mock data
-  const displayStats = stats || mockStats;
+  const displayStats = stats ?? mockStats;
   const showMockBanner = !stats && !statsLoading && !statsError;
 
   if (statsLoading || batchesLoading) {
@@ -95,7 +96,7 @@ export const DashboardPage: React.FC = () => {
                   Jobs Hoy
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {displayStats.total_jobs_today}
+                  {displayStats?.total_jobs_today ?? 0}
                 </dd>
               </dl>
             </div>
@@ -116,7 +117,7 @@ export const DashboardPage: React.FC = () => {
                   Tasa de Éxito
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {displayStats.success_rate}%
+                  {formatNumber(displayStats?.success_rate ?? 0)}%
                 </dd>
               </dl>
             </div>
@@ -137,7 +138,7 @@ export const DashboardPage: React.FC = () => {
                   Lotes Activos
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {displayStats.active_batches}
+                  {displayStats?.active_batches ?? 0}
                 </dd>
               </dl>
             </div>
@@ -158,7 +159,7 @@ export const DashboardPage: React.FC = () => {
                   Jobs Pendientes
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {displayStats.pending_jobs}
+                  {displayStats?.pending_jobs ?? 0}
                 </dd>
               </dl>
             </div>
@@ -181,14 +182,14 @@ export const DashboardPage: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-900">{batch.name}</p>
                       <p className="text-sm text-gray-500">
-                        {batch.stats?.total_jobs || 0} jobs • {batch.status}
+                        {batch.stats?.total_contacts || 0} contactos • {batch.status}
                       </p>
                     </div>
                     <div className="flex items-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        batch.status === 'active' 
+                        batch.status === 'RUNNING' 
                           ? 'bg-green-100 text-green-800'
-                          : batch.status === 'paused'
+                          : batch.status === 'PAUSED'
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
@@ -233,19 +234,19 @@ export const DashboardPage: React.FC = () => {
         <h3 className="text-lg font-medium text-gray-900 mb-4">Resumen del Día</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{displayStats.completed_jobs_today}</div>
+            <div className="text-2xl font-bold text-green-600">{displayStats?.completed_jobs_today ?? 0}</div>
             <div className="text-sm text-gray-500">Completados</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{displayStats.in_progress_jobs}</div>
+            <div className="text-2xl font-bold text-blue-600">{displayStats?.in_progress_jobs ?? 0}</div>
             <div className="text-sm text-gray-500">En Progreso</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{displayStats.failed_jobs_today}</div>
+            <div className="text-2xl font-bold text-red-600">{displayStats?.failed_jobs_today ?? 0}</div>
             <div className="text-sm text-gray-500">Fallidos</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">${displayStats.revenue_today}</div>
+            <div className="text-2xl font-bold text-purple-600">${formatNumber(displayStats?.revenue_today ?? 0)}</div>
             <div className="text-sm text-gray-500">Ingresos</div>
           </div>
         </div>

@@ -38,15 +38,7 @@ export interface AccountModel {
     priority_support: boolean;
   };
   settings: {
-    allowed_call_hours: {
-      start: string;
-      end: string;
-    };
     timezone: string;
-    retry_settings: {
-      max_attempts: number;
-      retry_delay_hours: number;
-    };
   };
   api_token: string;
   created_at: string;
@@ -202,15 +194,7 @@ export interface CreateAccountRequest {
     priority_support: boolean;
   };
   settings: {
-    allowed_call_hours: {
-      start: string;
-      end: string;
-    };
     timezone: string;
-    retry_settings: {
-      max_attempts: number;
-      retry_delay_hours: number;
-    };
   };
 }
 

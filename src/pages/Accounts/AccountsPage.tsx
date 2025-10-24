@@ -4,6 +4,7 @@ import { AccountModel } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateAccountModal } from '@/components/accounts/CreateAccountModal';
 import { AccountDetailModal } from '@/components/accounts/AccountDetailModal';
+import { formatNumber, formatCredits, formatMinutes } from '@/utils/format';
 
 export const AccountsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -17,10 +18,20 @@ export const AccountsPage: React.FC = () => {
 
   const handleCreateAccount = async (accountData: any) => {
     try {
+      console.log('🚀 Intentando crear cuenta con:', accountData);
       await createAccountMutation.mutateAsync(accountData);
       setShowCreateModal(false);
-    } catch (error) {
-      console.error('Error creating account:', error);
+    } catch (error: any) {
+      console.error('❌ Error creating account:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      // Mostrar el error al usuario
+      alert(`Error al crear cuenta: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -170,7 +181,7 @@ export const AccountsPage: React.FC = () => {
                   Créditos Totales
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {accounts?.reduce((total, acc) => total + (acc.balance?.credits || 0), 0) || 0}
+                  {formatNumber(accounts?.reduce((total, acc) => total + (acc.balance?.credits || 0), 0) || 0)}
                 </dd>
               </dl>
             </div>
@@ -238,9 +249,9 @@ export const AccountsPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         {account.plan_type === 'credit_based' ? (
-                          <span className="font-medium">{account.balance?.credits || 0} créditos</span>
+                          <span className="font-medium">{formatCredits(account.balance?.credits || 0)}</span>
                         ) : (
-                          <span className="font-medium">{account.balance?.minutes || 0} min</span>
+                          <span className="font-medium">{formatMinutes(account.balance?.minutes || 0)}</span>
                         )}
                       </div>
                     </td>

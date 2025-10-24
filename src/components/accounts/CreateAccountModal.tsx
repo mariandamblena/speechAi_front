@@ -33,15 +33,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       priority_support: false
     },
     settings: {
-      allowed_call_hours: {
-        start: '09:00',
-        end: '18:00'
-      },
-      timezone: 'America/Santiago',
-      retry_settings: {
-        max_attempts: 3,
-        retry_delay_hours: 24
-      }
+      timezone: 'America/Santiago'
     }
   });
 
@@ -83,7 +75,38 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      // Limpiar datos antes de enviar - solo enviar campos definidos
+      const dataToSend: any = {
+        account_name: formData.account_name,
+        contact_name: formData.contact_name,
+        contact_email: formData.contact_email,
+        plan_type: formData.plan_type,
+        features: {
+          max_concurrent_calls: formData.features.max_concurrent_calls,
+          voice_cloning: formData.features.voice_cloning,
+          advanced_analytics: formData.features.advanced_analytics,
+          custom_integration: formData.features.custom_integration,
+          priority_support: formData.features.priority_support
+        },
+        settings: {
+          timezone: formData.settings.timezone
+        }
+      };
+      
+      // Solo agregar contact_phone si tiene valor
+      if (formData.contact_phone && formData.contact_phone.trim()) {
+        dataToSend.contact_phone = formData.contact_phone;
+      }
+      
+      // Agregar initial_credits o initial_minutes según el plan
+      if (formData.plan_type === 'credit_based') {
+        dataToSend.initial_credits = formData.initial_credits;
+      } else {
+        dataToSend.initial_minutes = formData.initial_minutes;
+      }
+      
+      console.log('📤 Enviando datos al backend:', dataToSend);
+      onSubmit(dataToSend);
     }
   };
 
@@ -114,32 +137,6 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       settings: {
         ...prev.settings,
         [setting]: value
-      }
-    }));
-  };
-
-  const handleTimeChange = (timeType: 'start' | 'end', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        allowed_call_hours: {
-          ...prev.settings.allowed_call_hours,
-          [timeType]: value
-        }
-      }
-    }));
-  };
-
-  const handleRetrySettingChange = (setting: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        retry_settings: {
-          ...prev.settings.retry_settings,
-          [setting]: value
-        }
       }
     }));
   };
@@ -248,7 +245,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
         {/* Características del Plan */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Características Incluidas</h3>
+          <h3 className="text-lg font-medium text-gray-900">Límites Técnicos</h3>
           
           <Input
             label="Llamadas Concurrentes Máximas"
@@ -259,73 +256,18 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
             min="1"
             max="50"
           />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.features.voice_cloning}
-                onChange={(e) => handleFeatureChange('voice_cloning', e.target.checked)}
-                className="mr-2"
-              />
-              <span>Clonación de Voz</span>
-            </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.features.advanced_analytics}
-                onChange={(e) => handleFeatureChange('advanced_analytics', e.target.checked)}
-                className="mr-2"
-              />
-              <span>Analytics Avanzados</span>
-            </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.features.custom_integration}
-                onChange={(e) => handleFeatureChange('custom_integration', e.target.checked)}
-                className="mr-2"
-              />
-              <span>Integración Personalizada</span>
-            </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.features.priority_support}
-                onChange={(e) => handleFeatureChange('priority_support', e.target.checked)}
-                className="mr-2"
-              />
-              <span>Soporte Prioritario</span>
-            </label>
-          </div>
+          <p className="text-sm text-gray-500 -mt-2">
+            Número máximo de llamadas simultáneas permitidas para esta cuenta
+          </p>
         </div>
 
         {/* Configuraciones */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Configuraciones de Llamadas</h3>
+          <h3 className="text-lg font-medium text-gray-900">Configuración Regional</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Hora de Inicio"
-              type="time"
-              value={formData.settings.allowed_call_hours.start}
-              onChange={(e) => handleTimeChange('start', e.target.value)}
-            />
-
-            <Input
-              label="Hora de Fin"
-              type="time"
-              value={formData.settings.allowed_call_hours.end}
-              onChange={(e) => handleTimeChange('end', e.target.value)}
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Zona Horaria
+              Zona Horaria por Defecto
             </label>
             <select
               value={formData.settings.timezone}
@@ -339,26 +281,9 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
               <option value="America/Bogota">Bogotá (GMT-5)</option>
               <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
             </select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Intentos Máximos"
-              type="number"
-              value={formData.settings.retry_settings.max_attempts}
-              onChange={(e) => handleRetrySettingChange('max_attempts', parseInt(e.target.value) || 1)}
-              min="1"
-              max="10"
-            />
-
-            <Input
-              label="Horas entre Intentos"
-              type="number"
-              value={formData.settings.retry_settings.retry_delay_hours}
-              onChange={(e) => handleRetrySettingChange('retry_delay_hours', parseInt(e.target.value) || 1)}
-              min="1"
-              max="168"
-            />
+            <p className="mt-1 text-sm text-gray-500">
+              Esta será la zona horaria predeterminada para las campañas de esta cuenta
+            </p>
           </div>
         </div>
 

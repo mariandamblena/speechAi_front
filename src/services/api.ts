@@ -39,6 +39,7 @@ api.interceptors.response.use(
     console.log('Response Data:', error.response?.data);
     console.log('Request URL:', error.config?.url);
     console.log('Request Method:', error.config?.method?.toUpperCase());
+    console.log('Request Body:', error.config?.data ? JSON.parse(error.config.data) : undefined);
     console.log('Base URL:', error.config?.baseURL);
     console.log('Full URL:', `${error.config?.baseURL}${error.config?.url}`);
     console.log('Request Params:', error.config?.params);
