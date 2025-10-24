@@ -19,18 +19,23 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   isLoading,
   accounts
 }) => {
+  // Log cuentas disponibles cuando el modal se abre
+  React.useEffect(() => {
+    if (isOpen && accounts) {
+      console.group('🏢 Cuentas disponibles:');
+      console.log('Total de cuentas:', accounts.length);
+      accounts.forEach((account, index) => {
+        console.log(`${index + 1}. ${account.account_name} (ID: ${account.account_id}, Créditos: ${account.balance?.credits || 0})`);
+      });
+      console.groupEnd();
+    }
+  }, [isOpen, accounts]);
+
   const [formData, setFormData] = useState<CreateBatchRequest>({
     account_id: '',
     name: '',
     description: '',
-    script_content: '',
-    voice_settings: {
-      voice_id: 'default',
-      speed: 1.0,
-      pitch: 0,
-      volume: 1.0,
-      language: 'es-CL'
-    },
+    priority: 1, // 1=low, 2=normal, 3=high, 4=urgent
     call_settings: {
       max_call_duration: 300, // 5 minutos
       ring_timeout: 30,
@@ -43,12 +48,8 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
       days_of_week: [1, 2, 3, 4, 5], // Lunes a Viernes
       timezone: 'America/Santiago'
     },
-    contacts_data: [],
     excel_file: null,
-    schedule_type: 'immediate', // immediate, scheduled, recurring
-    scheduled_start: null,
-    recurring_config: null,
-    priority: 'normal'
+    allow_duplicates: false // Default: no permitir duplicados
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -82,9 +83,9 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar que sea un archivo Excel
-    if (!file.name.match(/\.(csv)$/)) {
-      setErrors(prev => ({ ...prev, excel_file: 'Debe ser un archivo CSV (.csv)' }));
+    // Validar que sea un archivo Excel o CSV
+    if (!file.name.match(/\.(csv|xls|xlsx)$/i)) {
+      setErrors(prev => ({ ...prev, excel_file: 'Debe ser un archivo Excel (.xls, .xlsx) o CSV (.csv)' }));
       return;
     }
 
@@ -100,6 +101,8 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   };
 
   const handleDayToggle = (day: number) => {
+    if (!formData.call_settings) return;
+    
     const currentDays = formData.call_settings.days_of_week;
     const newDays = currentDays.includes(day)
       ? currentDays.filter(d => d !== day)
@@ -112,25 +115,27 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
-      if (!formData.account_id) newErrors.account_id = 'Debe seleccionar una cuenta';
+      if (!formData.account_id || formData.account_id === '' || formData.account_id === 'string') {
+        newErrors.account_id = '⚠️ Debe seleccionar una cuenta válida del dropdown';
+      }
       if (!formData.name.trim()) newErrors.name = 'El nombre es requerido';
-      if (!formData.script_content.trim()) newErrors.script_content = 'El script es requerido';
+      // Script es opcional - no validar
     }
 
     if (step === 2) {
-      if (!formData.excel_file && formData.contacts_data.length === 0) {
-        newErrors.excel_file = 'Debe cargar un archivo Excel o agregar contactos manualmente';
+      if (!formData.excel_file) {
+        newErrors.excel_file = 'Debe cargar un archivo Excel';
       }
     }
 
     if (step === 3) {
-      if (formData.call_settings.max_call_duration <= 0) {
+      if (formData.call_settings && formData.call_settings.max_call_duration <= 0) {
         newErrors.max_call_duration = 'La duración máxima debe ser mayor a 0';
       }
-      if (formData.call_settings.max_attempts <= 0) {
+      if (formData.call_settings && formData.call_settings.max_attempts <= 0) {
         newErrors.max_attempts = 'Los intentos máximos deben ser mayor a 0';
       }
-      if (formData.call_settings.days_of_week.length === 0) {
+      if (formData.call_settings && formData.call_settings.days_of_week.length === 0) {
         newErrors.days_of_week = 'Debe seleccionar al menos un día de la semana';
       }
     }
@@ -152,6 +157,27 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateStep(currentStep)) {
+      console.group('📤 Enviando batch con datos:');
+      console.log('Form Data completo:', formData);
+      console.log('account_id:', formData.account_id);
+      console.log('account_id tipo:', typeof formData.account_id);
+      console.log('name:', formData.name);
+      console.log('excel_file:', formData.excel_file?.name);
+      console.log('Call Settings (will be JSON stringified):', formData.call_settings);
+      
+      // Validación crítica
+      if (!formData.account_id || formData.account_id === 'string' || formData.account_id === '') {
+        console.error('❌ ERROR: account_id inválido:', formData.account_id);
+        console.error('💡 SOLUCIÓN: Debes seleccionar una cuenta del dropdown en el Step 1');
+        console.error('📋 Cuentas disponibles:', accounts?.length || 0);
+        alert('❌ Error: Debes seleccionar una cuenta válida del dropdown en el Step 1.\n\n' + 
+              'El campo "Cuenta de Cliente" no puede estar vacío.\n\n' +
+              `Cuentas disponibles: ${accounts?.length || 0}`);
+        console.groupEnd();
+        return;
+      }
+      
+      console.groupEnd();
       onSubmit(formData);
     }
   };
@@ -162,10 +188,9 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   };
 
   const steps = [
-    { title: 'Información Básica', description: 'Cuenta, nombre y script' },
+    { title: 'Información Básica', description: 'Cuenta y nombre' },
     { title: 'Contactos', description: 'Cargar datos desde Excel' },
-    { title: 'Configuración de Llamadas', description: 'Parámetros de ejecución' },
-    { title: 'Programación', description: 'Cuándo ejecutar la campaña' }
+    { title: 'Configuración de Llamadas', description: 'Parámetros de ejecución' }
   ];
 
   return (
@@ -205,22 +230,35 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cuenta de Cliente
+                  Cuenta de Cliente <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.account_id}
-                  onChange={(e) => handleInputChange('account_id', e.target.value)}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    console.log('🔄 Cuenta seleccionada:', selectedId);
+                    handleInputChange('account_id', selectedId);
+                  }}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 >
-                  <option value="">Seleccionar cuenta...</option>
-                  {accounts.map((account) => (
-                    <option key={account.account_id} value={account.account_id}>
-                      {account.account_name} ({account.balance?.credits || 0} créditos)
-                    </option>
-                  ))}
+                  <option value="">⚠️ Seleccionar cuenta...</option>
+                  {accounts && accounts.length > 0 ? (
+                    accounts.map((account) => (
+                      <option key={account.account_id} value={account.account_id}>
+                        {account.account_name} ({account.balance?.credits || 0} créditos)
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No hay cuentas disponibles</option>
+                  )}
                 </select>
                 {errors.account_id && <p className="text-red-500 text-sm mt-1">{errors.account_id}</p>}
+                {formData.account_id && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✅ Cuenta seleccionada: {accounts.find(a => a.account_id === formData.account_id)?.account_name}
+                  </p>
+                )}
               </div>
 
               <Input
@@ -238,63 +276,6 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Descripción de la campaña..."
               />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Script de la Llamada
-                </label>
-                <textarea
-                  value={formData.script_content}
-                  onChange={(e) => handleInputChange('script_content', e.target.value)}
-                  rows={8}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Hola {nombre}, le llamamos de {empresa} para informarle sobre su deuda de {monto_deuda}..."
-                  required
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Puedes usar variables como {`{nombre}`}, {`{monto_deuda}`}, {`{empresa}`}, etc.
-                </p>
-                {errors.script_content && <p className="text-red-500 text-sm mt-1">{errors.script_content}</p>}
-              </div>
-
-              {/* Voice Settings */}
-              <div className="space-y-4">
-                <h4 className="text-md font-medium text-gray-900">Configuración de Voz</h4>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Velocidad de Habla
-                    </label>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="2.0"
-                      step="0.1"
-                      value={formData.voice_settings.speed}
-                      onChange={(e) => handleInputChange('voice_settings.speed', parseFloat(e.target.value))}
-                      className="w-full"
-                    />
-                    <div className="text-sm text-gray-500 text-center">{formData.voice_settings.speed}x</div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Idioma
-                    </label>
-                    <select
-                      value={formData.voice_settings.language}
-                      onChange={(e) => handleInputChange('voice_settings.language', e.target.value)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                      <option value="es-CL">Español (Chile)</option>
-                      <option value="es-AR">Español (Argentina)</option>
-                      <option value="es-MX">Español (México)</option>
-                      <option value="es-ES">Español (España)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -311,7 +292,7 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                   <div className="text-center">
                     <input
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xls,.xlsx"
                       onChange={handleFileUpload}
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
@@ -321,6 +302,27 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                   </div>
                 </div>
                 {errors.excel_file && <p className="text-red-500 text-sm mt-1">{errors.excel_file}</p>}
+              </div>
+
+              {/* Checkbox: Permitir Duplicados */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.allow_duplicates}
+                    onChange={(e) => handleInputChange('allow_duplicates', e.target.checked)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      Permitir contactos duplicados
+                    </span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Si los contactos ya existen en otras campañas de esta cuenta, permite crear un nuevo batch con ellos.
+                      Útil para crear nuevas campañas con los mismos contactos o reintentar con diferentes horarios.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {/* Excel Preview */}
@@ -364,7 +366,7 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
           )}
 
           {/* Step 3: Configuración de Llamadas */}
-          {currentStep === 3 && (
+          {currentStep === 3 && formData.call_settings && (
             <div className="space-y-6">
               <h3 className="text-lg font-medium text-gray-900">Configuración de Llamadas</h3>
               
@@ -435,7 +437,7 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                       type="button"
                       onClick={() => handleDayToggle(day)}
                       className={`px-3 py-2 rounded-md text-sm font-medium ${
-                        formData.call_settings.days_of_week.includes(day)
+                        formData.call_settings?.days_of_week.includes(day)
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
@@ -470,123 +472,15 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                   Prioridad de la Campaña
                 </label>
                 <select
-                  value={formData.priority}
-                  onChange={(e) => handleInputChange('priority', e.target.value)}
+                  value={formData.priority || 1}
+                  onChange={(e) => handleInputChange('priority', parseInt(e.target.value))}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  <option value="low">Baja</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
+                  <option value="1">Baja</option>
+                  <option value="2">Normal</option>
+                  <option value="3">Alta</option>
+                  <option value="4">Urgente</option>
                 </select>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Programación */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900">Programación de Ejecución</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Programación
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="schedule_type"
-                      value="immediate"
-                      checked={formData.schedule_type === 'immediate'}
-                      onChange={(e) => handleInputChange('schedule_type', e.target.value)}
-                      className="mr-2"
-                    />
-                    <span>Iniciar Inmediatamente</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="schedule_type"
-                      value="scheduled"
-                      checked={formData.schedule_type === 'scheduled'}
-                      onChange={(e) => handleInputChange('schedule_type', e.target.value)}
-                      className="mr-2"
-                    />
-                    <span>Programar para una fecha específica</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="schedule_type"
-                      value="recurring"
-                      checked={formData.schedule_type === 'recurring'}
-                      onChange={(e) => handleInputChange('schedule_type', e.target.value)}
-                      className="mr-2"
-                    />
-                    <span>Programación Recurrente</span>
-                  </label>
-                </div>
-              </div>
-
-              {formData.schedule_type === 'scheduled' && (
-                <Input
-                  label="Fecha y Hora de Inicio"
-                  type="datetime-local"
-                  value={formData.scheduled_start || ''}
-                  onChange={(e) => handleInputChange('scheduled_start', e.target.value)}
-                />
-              )}
-
-              {formData.schedule_type === 'recurring' && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    La programación recurrente permite ejecutar la campaña automáticamente en intervalos regulares.
-                  </p>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">
-                      Configuración de recurrencia se implementará en una versión posterior.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="text-md font-medium text-blue-900 mb-2">Resumen de la Campaña</h4>
-                <dl className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Cuenta:</dt>
-                    <dd className="text-blue-900">
-                      {accounts.find(acc => acc.account_id === formData.account_id)?.account_name || 'No seleccionada'}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Nombre:</dt>
-                    <dd className="text-blue-900">{formData.name || 'Sin nombre'}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Contactos:</dt>
-                    <dd className="text-blue-900">{excelPreview.length} contactos</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Horario:</dt>
-                    <dd className="text-blue-900">
-                      {formData.call_settings.allowed_hours.start} - {formData.call_settings.allowed_hours.end}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Intentos máximos:</dt>
-                    <dd className="text-blue-900">{formData.call_settings.max_attempts}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-blue-700">Programación:</dt>
-                    <dd className="text-blue-900">
-                      {formData.schedule_type === 'immediate' ? 'Inmediata' :
-                       formData.schedule_type === 'scheduled' ? 'Programada' : 'Recurrente'}
-                    </dd>
-                  </div>
-                </dl>
               </div>
             </div>
           )}
@@ -602,7 +496,7 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
             </Button>
             
             <div className="flex space-x-3">
-              {currentStep < 4 ? (
+              {currentStep < 3 ? (
                 <Button
                   type="button"
                   variant="primary"

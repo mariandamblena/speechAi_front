@@ -36,17 +36,26 @@ api.interceptors.response.use(
     console.group('🔴 API Error Details:');
     console.log('Status:', error.response?.status);
     console.log('Message:', error.message);
-    console.log('Response Data:', error.response?.data);
+    console.log('Response Data (completo):', error.response?.data);
+    
+    // Si hay un detalle específico del backend, mostrarlo
+    const responseData = error.response?.data as any;
+    if (responseData?.detail) {
+      console.log('❌ Backend Error Detail:', responseData.detail);
+    }
+    
     console.log('Request URL:', error.config?.url);
     console.log('Request Method:', error.config?.method?.toUpperCase());
-    console.log('Request Body:', error.config?.data ? JSON.parse(error.config.data) : undefined);
+    
+    // Only parse JSON if Content-Type is application/json
+    const isFormData = error.config?.data instanceof FormData;
+    console.log('Request Body:', isFormData ? '[FormData]' : (error.config?.data ? JSON.parse(error.config.data) : undefined));
     console.log('Base URL:', error.config?.baseURL);
     console.log('Full URL:', `${error.config?.baseURL}${error.config?.url}`);
     console.log('Request Params:', error.config?.params);
     console.groupEnd();
     
     // Transform to ApiError for consistency
-    const responseData = error.response?.data as any;
     const apiError: ApiError = {
       message: responseData?.message || error.message || 'An error occurred',
       code: responseData?.code || 'API_ERROR',

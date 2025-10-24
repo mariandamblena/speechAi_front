@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBatches, useCreateBatch, useAccounts } from '@/services/queries';
+import { useBatches, useCreateBatch, useCreateBatchFromExcel, useAccounts } from '@/services/queries';
 import { BatchModel, CreateBatchRequest } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateBatchModal } from '@/components/batches/CreateBatchModal';
@@ -9,19 +9,96 @@ export const BatchesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchModel | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: batches, isLoading, error } = useBatches(
     statusFilter === 'all' ? {} : { status: statusFilter }
   );
   const { data: accounts } = useAccounts();
   const createBatchMutation = useCreateBatch();
+  const createBatchFromExcelMutation = useCreateBatchFromExcel();
 
   const handleCreateBatch = async (batchData: CreateBatchRequest) => {
+    setIsCreating(true);
     try {
-      await createBatchMutation.mutateAsync(batchData);
+      console.group('🔍 BatchesPage - Datos recibidos del modal:');
+      console.log('batchData completo:', batchData);
+      console.log('account_id:', batchData.account_id);
+      console.log('account_id tipo:', typeof batchData.account_id);
+      console.log('name:', batchData.name);
+      console.log('excel_file:', batchData.excel_file?.name);
+      console.groupEnd();
+      
+      // Si hay un archivo Excel, usar el endpoint específico
+      if (batchData.excel_file) {
+        console.group('📤 Enviando a createBatchFromExcel con:');
+        console.log('file:', batchData.excel_file.name);
+        console.log('accountId:', batchData.account_id);
+        console.log('batchName:', batchData.name);
+        console.log('callSettings:', batchData.call_settings);
+        console.log('allowDuplicates:', batchData.allow_duplicates);
+        console.groupEnd();
+        
+        const response = await createBatchFromExcelMutation.mutateAsync({
+          file: batchData.excel_file,
+          accountId: batchData.account_id,
+          batchName: batchData.name,
+          batchDescription: batchData.description,
+          allowDuplicates: batchData.allow_duplicates ?? false,
+          callSettings: batchData.call_settings,
+          processingType: 'basic'
+        });
+        
+        // Mostrar mensaje de éxito
+        console.log('✅ Response exitosa:', response);
+        
+        const successMessage = [
+          '✅ ¡Campaña creada exitosamente!',
+          '',
+          `📋 Nombre: ${batchData.name}`,
+          `🆔 Batch ID: ${response?.batch_id || 'N/A'}`,
+          `📞 Jobs creados: ${response?.jobs_created || 0}`,
+          `👥 Contactos procesados: ${response?.contacts_processed || response?.jobs_created || 0}`,
+        ];
+        
+        if (response?.duplicates_skipped && response.duplicates_skipped > 0) {
+          successMessage.push(`⚠️ Duplicados omitidos: ${response.duplicates_skipped}`);
+        }
+        
+        alert(successMessage.join('\n'));
+      } else {
+        // Sin archivo, crear batch normal con JSON
+        const response = await createBatchMutation.mutateAsync(batchData);
+        console.log('✅ Batch creado (sin Excel):', response);
+        alert(`✅ ¡Campaña creada exitosamente!\n\n📋 Nombre: ${batchData.name}`);
+      }
+      
       setShowCreateModal(false);
-    } catch (error) {
-      console.error('Error creating batch:', error);
+    } catch (error: any) {
+      console.error('❌ Error creating batch:', error);
+      
+      // Mostrar error específico
+      const errorDetail = error?.response?.data?.detail || 
+                         error?.response?.data?.error ||
+                         error?.message || 
+                         'Error desconocido al crear la campaña';
+      
+      const errorMessage = [
+        '❌ Error al crear campaña',
+        '',
+        errorDetail,
+        '',
+        '💡 Posibles soluciones:',
+        '• Verifica que seleccionaste una cuenta válida',
+        '• Revisa que el archivo Excel tenga el formato correcto',
+        '• Si hay contactos duplicados, activa la opción "Permitir duplicados"',
+        '',
+        'Revisa la consola del navegador para más detalles (F12)'
+      ];
+      
+      alert(errorMessage.join('\n'));
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -355,7 +432,7 @@ export const BatchesPage: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreateBatch}
-        isLoading={createBatchMutation.isPending}
+        isLoading={isCreating || createBatchMutation.isPending || createBatchFromExcelMutation.isPending}
         accounts={accounts || []}
       />
 

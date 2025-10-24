@@ -22,7 +22,18 @@ export const DashboardPage: React.FC = () => {
   };
 
   // Use real data if available, otherwise use mock data
-  const displayStats = stats ?? mockStats;
+  const displayStats = stats ? {
+    total_accounts: stats.total_accounts || 0,
+    active_batches: stats.active_batches || 0,
+    total_jobs_today: stats.total_jobs || 0, // ⚠️ Backend retorna total, no "today"
+    success_rate: stats.success_rate || 0,
+    total_minutes_used: 0, // ⚠️ No disponible en backend
+    revenue_today: stats.total_revenue || 0, // ⚠️ Backend retorna total, no "today"
+    pending_jobs: stats.pending_jobs || 0,
+    in_progress_jobs: 0, // ⚠️ No disponible en backend
+    completed_jobs_today: stats.completed_jobs || 0, // ⚠️ Backend retorna total, no "today"
+    failed_jobs_today: stats.failed_jobs || 0, // ⚠️ Backend retorna total, no "today"
+  } : mockStats;
   const showMockBanner = !stats && !statsLoading && !statsError;
 
   if (statsLoading || batchesLoading) {

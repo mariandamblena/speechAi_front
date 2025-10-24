@@ -14,7 +14,7 @@ interface FileUploaderProps {
 export const FileUploader: React.FC<FileUploaderProps> = ({
   onUpload,
   onProgress,
-  accept = ['.csv'],
+  accept = ['.csv', '.xls', '.xlsx'],
   maxSize = 10 * 1024 * 1024, // 10MB default
   isLoading = false,
   error
@@ -35,7 +35,9 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
-      'text/csv': ['.csv']
+      'text/csv': ['.csv'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
     },
     maxSize,
     multiple: false,

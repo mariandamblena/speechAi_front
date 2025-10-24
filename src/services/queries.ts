@@ -274,7 +274,9 @@ export const useCreateBatch = () => {
   
   return useMutation({
     mutationFn: async (batchData: CreateBatchRequest) => {
-      const response = await api.post('/batches', batchData);
+      // Eliminar excel_file del payload JSON (se maneja por separado)
+      const { excel_file, ...jsonData } = batchData;
+      const response = await api.post('/batches', jsonData);
       return response.data;
     },
     onSuccess: () => {
@@ -452,16 +454,65 @@ export const useCreateBatchFromExcel = () => {
     mutationFn: async ({
       file,
       accountId,
+      batchName,
+      batchDescription,
+      allowDuplicates = false,
+      callSettings,
       processingType = 'basic',
+      diasFechaLimite,
+      diasFechaMaxima
     }: {
       file: File;
       accountId: string;
+      batchName?: string;
+      batchDescription?: string;
+      allowDuplicates?: boolean;
+      callSettings?: any; // CallSettings interface
       processingType?: 'basic' | 'acquisition';
+      diasFechaLimite?: number;
+      diasFechaMaxima?: number;
     }) => {
+      console.group('🔧 useCreateBatchFromExcel - Construyendo FormData:');
+      console.log('Parámetros recibidos:');
+      console.log('  - file:', file?.name);
+      console.log('  - accountId:', accountId);
+      console.log('  - accountId tipo:', typeof accountId);
+      console.log('  - batchName:', batchName);
+      console.log('  - callSettings:', callSettings);
+      
       const formData = new FormData();
+      
+      // Required fields
       formData.append('file', file);
       formData.append('account_id', accountId);
-      formData.append('processing_type', processingType);
+      
+      // Optional fields
+      if (batchName) formData.append('batch_name', batchName);
+      if (batchDescription) formData.append('batch_description', batchDescription);
+      formData.append('allow_duplicates', allowDuplicates.toString());
+      
+      // ⚠️ IMPORTANTE: call_settings debe enviarse como JSON STRING
+      if (callSettings) {
+        const callSettingsJson = JSON.stringify(callSettings);
+        console.log('  - call_settings_json:', callSettingsJson.substring(0, 100) + '...');
+        formData.append('call_settings_json', callSettingsJson);
+      }
+      
+      // Processing type and date limits
+      if (processingType) formData.append('processing_type', processingType);
+      if (diasFechaLimite !== undefined) formData.append('dias_fecha_limite', diasFechaLimite.toString());
+      if (diasFechaMaxima !== undefined) formData.append('dias_fecha_maxima', diasFechaMaxima.toString());
+      
+      // Log FormData contents
+      console.log('📋 FormData final:');
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: [File] ${value.name}`);
+        } else {
+          console.log(`  ${key}:`, value);
+        }
+      }
+      console.groupEnd();
       
       const response = await api.post('/batches/excel/create', formData, {
         headers: {

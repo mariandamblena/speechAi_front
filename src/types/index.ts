@@ -202,15 +202,8 @@ export interface CreateBatchRequest {
   account_id: string;
   name: string;
   description?: string;
-  script_content: string;
-  voice_settings: {
-    voice_id: string;
-    speed: number;
-    pitch: number;
-    volume: number;
-    language: string;
-  };
-  call_settings: {
+  priority?: number; // 1-4: 1=low, 2=normal, 3=high, 4=urgent (default: 1)
+  call_settings?: {
     max_call_duration: number;
     ring_timeout: number;
     max_attempts: number;
@@ -222,12 +215,8 @@ export interface CreateBatchRequest {
     days_of_week: number[];
     timezone: string;
   };
-  contacts_data: any[];
   excel_file?: File | null;
-  schedule_type: 'immediate' | 'scheduled' | 'recurring';
-  scheduled_start?: string | null;
-  recurring_config?: any | null;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  allow_duplicates?: boolean; // Permitir contactos duplicados en otros batches (default: false)
 }
 
 export interface TopupRequest {
@@ -248,7 +237,10 @@ export interface ExcelPreviewResponse {
 export interface ExcelCreateResponse {
   success: boolean;
   batch_id: string;
+  batch_name?: string;
   jobs_created: number;
+  contacts_processed?: number;
+  duplicates_skipped?: number;
   errors: Array<{
     rowIndex: number;
     errors: Array<{
@@ -264,16 +256,25 @@ export interface ExcelCreateResponse {
 
 // Dashboard Stats
 export interface DashboardStats {
+  // Campos que retorna el backend (según API_ENDPOINTS_REFERENCE.md)
   total_accounts: number;
+  active_accounts?: number;
+  total_batches?: number;
   active_batches: number;
-  total_jobs_today: number;
-  success_rate: number;
-  total_minutes_used: number;
-  revenue_today: number;
+  total_jobs: number; // Total acumulado (no "today")
   pending_jobs: number;
-  in_progress_jobs: number;
-  completed_jobs_today: number;
-  failed_jobs_today: number;
+  completed_jobs: number; // Total acumulado (no "today")
+  failed_jobs: number; // Total acumulado (no "today")
+  success_rate: number;
+  total_revenue: number; // Total acumulado (no "today")
+  
+  // Campos que el frontend espera pero backend NO retorna actualmente
+  total_jobs_today?: number; // ⚠️ Futuro
+  total_minutes_used?: number; // ⚠️ No disponible
+  revenue_today?: number; // ⚠️ Futuro
+  in_progress_jobs?: number; // ⚠️ No disponible
+  completed_jobs_today?: number; // ⚠️ Futuro
+  failed_jobs_today?: number; // ⚠️ Futuro
 }
 
 // Call History

@@ -25,15 +25,23 @@ export const Layout: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center">
-              <img 
-                src="/logo.svg" 
-                alt="SpeechAI Campaign Manager" 
-                className="h-8 w-auto"
-              />
+            {/* Logo con efecto de iluminación */}
+            <div className="flex items-center group">
+              <div className="relative">
+                {/* Efecto de iluminación de fondo */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 rounded-lg blur-lg opacity-0 group-hover:opacity-70 transition-all duration-500 scale-125"></div>
+                
+                {/* Logo */}
+                <div className="relative">
+                  <img 
+                    src="/logo.svg" 
+                    alt="SpeechAI Campaign Manager" 
+                    className="h-8 w-auto relative z-10 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* User menu */}
