@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { BatchModel } from '@/types';
-import { useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch } from '@/services/queries';
+import { BatchModel, JobModel } from '@/types';
+import { useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch, useBulkDeleteJobs } from '@/services/queries';
+import { JobDetailModal } from '@/components/jobs/JobDetailModal';
+import { Trash2, Filter, X } from 'lucide-react';
 
 interface BatchDetailModalProps {
   batch: BatchModel | null;
@@ -16,11 +18,25 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'settings' | 'logs'>('overview');
+  const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
+  const [isJobDetailOpen, setIsJobDetailOpen] = useState(false);
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
+  
+  // Filtros
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Selección múltiple
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const { data: jobs, isLoading: jobsLoading } = useBatchJobs(
     batch?.batch_id || '', 
     { enabled: !!batch && activeTab === 'jobs' }
   );
+  
+  const bulkDeleteMutation = useBulkDeleteJobs();
 
   const pauseBatchMutation = usePauseBatch();
   const resumeBatchMutation = useResumeBatch();
@@ -110,6 +126,131 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     }
   };
 
+  const handleViewJobDetail = (job: JobModel) => {
+    setSelectedJob(job);
+    setIsJobDetailOpen(true);
+  };
+
+  const handleExportCSV = () => {
+    if (!jobs || !Array.isArray(jobs) || jobs.length === 0) {
+      alert('No hay llamadas para exportar');
+      return;
+    }
+
+    // Crear CSV
+    const headers = ['Contacto', 'Teléfono', 'Estado', 'Intentos', 'Duración (s)', 'Fecha', 'Costo'];
+    const rows = jobs.map((job: any) => [
+      job.contact?.name || 'N/A',
+      job.contact?.phones?.[0] || 'N/A',
+      job.status,
+      `${job.attempts || 0}/${job.max_attempts || 3}`,
+      job.call_duration_seconds || 0,
+      new Date(job.created_at).toLocaleDateString(),
+      job.estimated_cost || 0
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Descargar archivo
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `llamadas_${batch.name}_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleEditConfig = () => {
+    setIsEditingConfig(true);
+    // TODO: Implementar modal de edición o navegar a página de edición
+    alert('Funcionalidad de edición en desarrollo. Por ahora, puedes duplicar la campaña y crear una nueva con la configuración modificada.');
+  };
+
+  // Filtrar jobs
+  const filteredJobs = React.useMemo(() => {
+    if (!jobs || !Array.isArray(jobs)) return [];
+    
+    let filtered = jobs;
+    
+    // Filtro por estado
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((job: any) => job.status === statusFilter);
+    }
+    
+    // Filtro por búsqueda (nombre o teléfono)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((job: any) => {
+        const name = (job.contact?.name || '').toLowerCase();
+        const phone = (job.contact?.phones?.[0] || '').toLowerCase();
+        return name.includes(query) || phone.includes(query);
+      });
+    }
+    
+    return filtered;
+  }, [jobs, statusFilter, searchQuery]);
+
+  // Manejar selección de todos
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedJobIds(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(filteredJobs.map((job: any) => job._id));
+      setSelectedJobIds(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  // Manejar selección individual
+  const handleSelectJob = (jobId: string) => {
+    const newSelected = new Set(selectedJobIds);
+    if (newSelected.has(jobId)) {
+      newSelected.delete(jobId);
+    } else {
+      newSelected.add(jobId);
+    }
+    setSelectedJobIds(newSelected);
+    setSelectAll(newSelected.size === filteredJobs.length && filteredJobs.length > 0);
+  };
+
+  // Eliminar jobs seleccionados
+  const handleBulkDelete = async () => {
+    if (selectedJobIds.size === 0) {
+      alert('No hay jobs seleccionados');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Estás seguro de que quieres eliminar ${selectedJobIds.size} llamada(s)?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const result = await bulkDeleteMutation.mutateAsync(Array.from(selectedJobIds));
+      alert(`Eliminadas: ${result.successful}/${result.total}\nFallidas: ${result.failed}`);
+      setSelectedJobIds(new Set());
+      setSelectAll(false);
+    } catch (error) {
+      console.error('Error deleting jobs:', error);
+      alert('Error al eliminar las llamadas');
+    }
+  };
+
+  // Limpiar filtros
+  const handleClearFilters = () => {
+    setStatusFilter('all');
+    setSearchQuery('');
+    setShowFilters(false);
+  };
+
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: '📊' },
     { id: 'jobs', label: 'Llamadas', icon: '📞' },
@@ -132,7 +273,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 {getStatusText(batch.status)}
               </span>
               {batch.status === 'RUNNING' && (
-                <Button size="sm" variant="warning" onClick={handlePause}>
+                <Button size="sm" variant="danger" onClick={handlePause}>
                   Pausar
                 </Button>
               )}
@@ -313,14 +454,84 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-medium text-gray-900">Lista de Llamadas</h4>
                 <div className="flex space-x-2">
-                  <Button size="sm" variant="secondary">
+                  {selectedJobIds.size > 0 && (
+                    <Button 
+                      size="sm" 
+                      variant="danger"
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Eliminar ({selectedJobIds.size})
+                    </Button>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={handleExportCSV}>
                     Exportar CSV
                   </Button>
-                  <Button size="sm" variant="primary">
+                  <Button 
+                    size="sm" 
+                    variant="primary"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    <Filter className="w-4 h-4 mr-1" />
                     Filtrar
                   </Button>
                 </div>
               </div>
+
+              {/* Panel de Filtros */}
+              {showFilters && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-medium text-gray-900">Filtros</h5>
+                    <button
+                      onClick={handleClearFilters}
+                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Limpiar filtros
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Estado
+                      </label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">Todos</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En Progreso</option>
+                        <option value="completed">Completado</option>
+                        <option value="done">Hecho</option>
+                        <option value="failed">Fallido</option>
+                        <option value="cancelled">Cancelado</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Buscar
+                      </label>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Nombre o teléfono..."
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="text-sm text-gray-600">
+                    Mostrando {filteredJobs.length} de {jobs?.length || 0} llamadas
+                  </div>
+                </div>
+              )}
 
               {jobsLoading ? (
                 <div className="flex items-center justify-center h-32">
@@ -330,11 +541,23 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 <div className="text-center py-8 text-gray-500">
                   No hay llamadas registradas para esta campaña
                 </div>
+              ) : filteredJobs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No se encontraron llamadas con los filtros aplicados
+                </div>
               ) : (
                 <div className="overflow-hidden border border-gray-200 rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-4 py-3 text-left">
+                          <input
+                            type="checkbox"
+                            checked={selectAll}
+                            onChange={handleSelectAll}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
@@ -345,8 +568,16 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {jobs.slice(0, 10).map((job: any) => (
+                      {filteredJobs.map((job: any) => (
                         <tr key={job._id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedJobIds.has(job._id)}
+                              onChange={() => handleSelectJob(job._id)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
                             {job.contact?.name || job.contact_info?.nombre || 'N/A'}
                           </td>
@@ -374,7 +605,11 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             {new Date(job.created_at).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-sm font-medium">
-                            <Button size="sm" variant="secondary">
+                            <Button 
+                              size="sm" 
+                              variant="secondary"
+                              onClick={() => handleViewJobDetail(job)}
+                            >
                               Ver Detalle
                             </Button>
                           </td>
@@ -382,11 +617,10 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       ))}
                     </tbody>
                   </table>
-                  {jobs.length > 10 && (
+                  {filteredJobs.length > 10 && (
                     <div className="bg-gray-50 px-4 py-3 text-center">
                       <p className="text-sm text-gray-500">
-                        Mostrando 10 de {jobs.length} llamadas. 
-                        <button className="text-blue-600 hover:underline ml-1">Ver todas</button>
+                        Mostrando primeros 10 de {filteredJobs.length} llamadas filtradas
                       </p>
                     </div>
                   )}
@@ -468,7 +702,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
               </div>
 
               <div className="flex justify-end space-x-3">
-                <Button variant="secondary">
+                <Button variant="secondary" onClick={handleEditConfig}>
                   Editar Configuración
                 </Button>
                 <Button variant="primary">
@@ -541,6 +775,16 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Job Detail Modal */}
+      <JobDetailModal
+        job={selectedJob}
+        isOpen={isJobDetailOpen}
+        onClose={() => {
+          setIsJobDetailOpen(false);
+          setSelectedJob(null);
+        }}
+      />
     </Modal>
   );
 };

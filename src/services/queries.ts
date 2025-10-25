@@ -723,6 +723,34 @@ export const useCancelJob = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+  });
+};
+
+// Bulk delete jobs
+export const useBulkDeleteJobs = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (jobIds: string[]) => {
+      // Delete jobs in parallel
+      const deletePromises = jobIds.map(jobId => 
+        api.delete(`/jobs/${jobId}`)
+      );
+      const responses = await Promise.allSettled(deletePromises);
+      
+      // Count successful and failed deletions
+      const successful = responses.filter(r => r.status === 'fulfilled').length;
+      const failed = responses.filter(r => r.status === 'rejected').length;
+      
+      return { successful, failed, total: jobIds.length };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
   });
 };
