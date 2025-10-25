@@ -18,7 +18,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'settings' | 'logs'>('overview');
 
   const { data: jobs, isLoading: jobsLoading } = useBatchJobs(
-    batch?._id || '', 
+    batch?.batch_id || '', 
     { enabled: !!batch && activeTab === 'jobs' }
   );
 
@@ -326,7 +326,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : !jobs || jobs.length === 0 ? (
+              ) : !jobs || !Array.isArray(jobs) || jobs.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No hay llamadas registradas para esta campaña
                 </div>
@@ -348,26 +348,27 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       {jobs.slice(0, 10).map((job: any) => (
                         <tr key={job._id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.contact_info?.nombre || 'N/A'}
+                            {job.contact?.name || job.contact_info?.nombre || 'N/A'}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.contact_info?.telefono || 'N/A'}
+                            {job.contact?.phones?.[0] || job.contact_info?.telefono || 'N/A'}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              job.status === 'completed' || job.status === 'done' ? 'bg-green-100 text-green-800' :
                               job.status === 'failed' ? 'bg-red-100 text-red-800' :
-                              job.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                              job.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                              job.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {job.status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.attempts_made || 0} / {job.max_attempts || 3}
+                            {job.attempts || job.attempts_made || 0} / {job.max_attempts || 3}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.call_result?.duration || 0}s
+                            {job.call_duration_seconds || job.call_result?.duration || 0}s
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-500">
                             {new Date(job.created_at).toLocaleDateString()}

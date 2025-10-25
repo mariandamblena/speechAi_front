@@ -336,8 +336,10 @@ export const useToggleBatchStatus = () => {
       const response = await api.patch(`/batches/${batchId}`, { is_active: isActive });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { batchId }) => {
+      queryClient.invalidateQueries({ queryKey: ['batches', batchId] });
       queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
   });
 };
@@ -392,11 +394,15 @@ export const usePauseBatch = () => {
   
   return useMutation({
     mutationFn: async (batchId: string) => {
-      const response = await api.put(`/batches/${batchId}/pause`);
+      const response = await api.patch(`/batches/${batchId}`, {
+        is_active: false
+      });
       return response.data;
     },
     onSuccess: (_, batchId) => {
       queryClient.invalidateQueries({ queryKey: ['batches', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
   });
 };
@@ -406,11 +412,43 @@ export const useResumeBatch = () => {
   
   return useMutation({
     mutationFn: async (batchId: string) => {
-      const response = await api.put(`/batches/${batchId}/resume`);
+      const response = await api.patch(`/batches/${batchId}`, {
+        is_active: true
+      });
       return response.data;
     },
     onSuccess: (_, batchId) => {
       queryClient.invalidateQueries({ queryKey: ['batches', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+  });
+};
+
+// Hook para actualizar múltiples campos del batch
+export const useUpdateBatch = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      batchId, 
+      updates 
+    }: { 
+      batchId: string; 
+      updates: {
+        is_active?: boolean;
+        name?: string;
+        description?: string;
+        priority?: number;
+      }
+    }) => {
+      const response = await api.patch(`/batches/${batchId}`, updates);
+      return response.data;
+    },
+    onSuccess: (_, { batchId }) => {
+      queryClient.invalidateQueries({ queryKey: ['batches', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     },
   });
 };
@@ -436,9 +474,12 @@ export const useBatchJobs = (batchId: string, options?: any) => {
   return useQuery({
     queryKey: ['batch-jobs', batchId],
     queryFn: async (): Promise<JobModel[]> => {
-      const response = await api.get(`/batches/${batchId}/jobs`);
+      const response = await api.get('/jobs', { 
+        params: { batch_id: batchId } 
+      });
       return response.data;
     },
+    enabled: !!batchId,
     ...options,
   });
 };
