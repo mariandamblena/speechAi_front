@@ -1,15 +1,37 @@
-import React, { useState } from 'react';
-import { useJobs } from '@/services/queries';
+import React, { useState, useMemo } from 'react';
+import { useJobs, useBulkDeleteJobs } from '@/services/queries';
 import { Button } from '@/components/ui/Button';
 import { JobModel, JobStatus } from '@/types';
 import { JobDetailModal } from '@/components/jobs/JobDetailModal';
+import { Trash2, Filter, X } from 'lucide-react';
 
 export const JobsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
   const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
+
   const { data: jobs, isLoading, error } = useJobs(
     statusFilter === 'all' ? {} : { status: statusFilter }
   );
+  const bulkDeleteMutation = useBulkDeleteJobs();
+
+  // Filtrar jobs por búsqueda
+  const filteredJobs = useMemo(() => {
+    if (!jobs || !Array.isArray(jobs)) return [];
+    
+    if (!searchQuery.trim()) return jobs;
+    
+    const query = searchQuery.toLowerCase();
+    return jobs.filter((job: JobModel) => {
+      const name = (job.contact?.name || '').toLowerCase();
+      const phone = (job.contact?.phones?.[0] || '').toLowerCase();
+      const batchId = (job.batch_id || '').toLowerCase();
+      return name.includes(query) || phone.includes(query) || batchId.includes(query);
+    });
+  }, [jobs, searchQuery]);
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
@@ -47,6 +69,66 @@ export const JobsPage: React.FC = () => {
     }
   };
 
+  // Manejar selección de todos
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedJobIds(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(filteredJobs.map((job: JobModel) => job._id));
+      setSelectedJobIds(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  // Manejar selección individual
+  const handleSelectJob = (jobId: string) => {
+    const newSelected = new Set(selectedJobIds);
+    if (newSelected.has(jobId)) {
+      newSelected.delete(jobId);
+    } else {
+      newSelected.add(jobId);
+    }
+    setSelectedJobIds(newSelected);
+    setSelectAll(newSelected.size === filteredJobs.length && filteredJobs.length > 0);
+  };
+
+  // Eliminar jobs seleccionados
+  const handleBulkDelete = async () => {
+    if (selectedJobIds.size === 0) {
+      alert('No hay tareas seleccionadas');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedJobIds.size} tarea(s)?`)) {
+      return;
+    }
+
+    try {
+      const result = await bulkDeleteMutation.mutateAsync(Array.from(selectedJobIds));
+      
+      if (result.failed > 0) {
+        alert(`Se eliminaron ${result.successful} tarea(s). ${result.failed} fallaron.`);
+      } else {
+        alert(`Se eliminaron ${result.successful} tarea(s) exitosamente`);
+      }
+      
+      // Limpiar selección
+      setSelectedJobIds(new Set());
+      setSelectAll(false);
+    } catch (error) {
+      console.error('Error al eliminar tareas:', error);
+      alert('Error al eliminar las tareas');
+    }
+  };
+
+  // Limpiar filtros
+  const handleClearFilters = () => {
+    setStatusFilter('all');
+    setSearchQuery('');
+    setShowFilters(false);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -67,7 +149,61 @@ export const JobsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Tareas de Procesamiento</h1>
+        
+        <div className="flex items-center space-x-2">
+          {selectedJobIds.size > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isLoading}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar ({selectedJobIds.size})
+            </Button>
+          )}
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Filtros
+          </Button>
+        </div>
       </div>
+
+      {/* Panel de filtros */}
+      {showFilters && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-700">Filtros de búsqueda</h3>
+            <button
+              onClick={handleClearFilters}
+              className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Limpiar filtros
+            </button>
+          </div>
+          
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Buscar
+              </label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nombre, teléfono o ID de lote..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
@@ -95,15 +231,23 @@ export const JobsPage: React.FC = () => {
 
       {/* Jobs list */}
       <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-        {!jobs || jobs.length === 0 ? (
+        {!filteredJobs || filteredJobs.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
-            No hay tareas que mostrar
+            {searchQuery ? 'No se encontraron tareas que coincidan con tu búsqueda' : 'No hay tareas que mostrar'}
           </div>
         ) : (
           <div className="overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Contacto
                   </th>
@@ -122,8 +266,16 @@ export const JobsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {jobs.map((job: JobModel) => (
+                {filteredJobs.map((job: JobModel) => (
                   <tr key={job._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedJobIds.has(job._id)}
+                        onChange={() => handleSelectJob(job._id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">

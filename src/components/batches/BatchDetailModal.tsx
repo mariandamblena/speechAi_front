@@ -31,17 +31,42 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
 
+  // TODOS los hooks deben estar antes de cualquier return condicional
   const { data: jobs, isLoading: jobsLoading } = useBatchJobs(
     batch?.batch_id || '', 
     { enabled: !!batch && activeTab === 'jobs' }
   );
   
   const bulkDeleteMutation = useBulkDeleteJobs();
-
   const pauseBatchMutation = usePauseBatch();
   const resumeBatchMutation = useResumeBatch();
   const cancelBatchMutation = useCancelBatch();
 
+  // Filtrar jobs - useMemo también debe estar antes del return
+  const filteredJobs = React.useMemo(() => {
+    if (!jobs || !Array.isArray(jobs)) return [];
+    
+    let filtered = jobs;
+    
+    // Filtro por estado
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((job: any) => job.status === statusFilter);
+    }
+    
+    // Filtro por búsqueda (nombre o teléfono)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((job: any) => {
+        const name = (job.contact?.name || '').toLowerCase();
+        const phone = (job.contact?.phones?.[0] || '').toLowerCase();
+        return name.includes(query) || phone.includes(query);
+      });
+    }
+    
+    return filtered;
+  }, [jobs, statusFilter, searchQuery]);
+
+  // AHORA sí podemos hacer el return condicional
   if (!batch) return null;
 
   const getStatusColor = (status: string) => {
@@ -171,30 +196,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     // TODO: Implementar modal de edición o navegar a página de edición
     alert('Funcionalidad de edición en desarrollo. Por ahora, puedes duplicar la campaña y crear una nueva con la configuración modificada.');
   };
-
-  // Filtrar jobs
-  const filteredJobs = React.useMemo(() => {
-    if (!jobs || !Array.isArray(jobs)) return [];
-    
-    let filtered = jobs;
-    
-    // Filtro por estado
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((job: any) => job.status === statusFilter);
-    }
-    
-    // Filtro por búsqueda (nombre o teléfono)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((job: any) => {
-        const name = (job.contact?.name || '').toLowerCase();
-        const phone = (job.contact?.phones?.[0] || '').toLowerCase();
-        return name.includes(query) || phone.includes(query);
-      });
-    }
-    
-    return filtered;
-  }, [jobs, statusFilter, searchQuery]);
 
   // Manejar selección de todos
   const handleSelectAll = () => {
@@ -528,7 +529,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   </div>
                   
                   <div className="text-sm text-gray-600">
-                    Mostrando {filteredJobs.length} de {jobs?.length || 0} llamadas
+                    Mostrando {filteredJobs.length} de {Array.isArray(jobs) ? jobs.length : 0} llamadas
                   </div>
                 </div>
               )}
