@@ -38,7 +38,21 @@ export const BatchesPage: React.FC = () => {
         console.log('file:', batchData.excel_file.name);
         console.log('accountId:', batchData.account_id);
         console.log('batchName:', batchData.name);
-        console.log('callSettings:', batchData.call_settings);
+        console.log('🔧 callSettings:', batchData.call_settings);
+        console.log('🔧 callSettings es null?', batchData.call_settings === null);
+        console.log('🔧 callSettings es undefined?', batchData.call_settings === undefined);
+        if (batchData.call_settings) {
+          console.log('✅ call_settings tiene datos:');
+          console.log('  - max_call_duration:', batchData.call_settings.max_call_duration);
+          console.log('  - ring_timeout:', batchData.call_settings.ring_timeout);
+          console.log('  - max_attempts:', batchData.call_settings.max_attempts);
+          console.log('  - retry_delay_hours:', batchData.call_settings.retry_delay_hours);
+          console.log('  - timezone:', batchData.call_settings.timezone);
+          console.log('  - days_of_week:', batchData.call_settings.days_of_week);
+          console.log('  - allowed_hours:', batchData.call_settings.allowed_hours);
+        } else {
+          console.error('❌ call_settings está vacío!');
+        }
         console.log('allowDuplicates:', batchData.allow_duplicates);
         console.groupEnd();
         

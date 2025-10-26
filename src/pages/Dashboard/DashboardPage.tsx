@@ -46,7 +46,7 @@ export const DashboardPage: React.FC = () => {
     completed_jobs_today: stats.completed_jobs || 0, // ⚠️ Backend retorna total, no "today"
     failed_jobs_today: stats.failed_jobs || 0, // ⚠️ Backend retorna total, no "today"
   } : mockStats;
-  const showMockBanner = !stats && !statsLoading && !statsError;
+  const showMockBanner: boolean = Boolean(!stats && !statsLoading && !statsError);
 
   if (statsLoading || batchesLoading) {
     return (
@@ -66,7 +66,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Mock Data Banner */}
-      {showMockBanner && (
+      {showMockBanner ? (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -82,7 +82,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Error Banner */}
       {statsError && (

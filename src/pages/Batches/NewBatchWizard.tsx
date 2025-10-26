@@ -42,6 +42,28 @@ export const NewBatchWizard: React.FC = () => {
   const excelPreviewMutation = useExcelPreview();
   const createBatchMutation = useCreateBatch();
 
+  // Función para resetear todo el wizard
+  const resetWizard = () => {
+    setCurrentStep(1);
+    setUploadData(null);
+    setUploadedFile(null);
+    setMappings({});
+    setConfig({
+      name: '',
+      description: '',
+      priority: 2,
+      max_call_duration: 300,
+      ring_timeout: 30,
+      max_attempts: 3,
+      retry_delay_hours: 24,
+      start_hour: '09:00',
+      end_hour: '18:00',
+      days_of_week: [1, 2, 3, 4, 5],
+      timezone: 'America/Santiago',
+      allow_duplicates: false,
+    });
+  };
+
   const handleFileUpload = async (file: File) => {
     try {
       // TODO: Get real account ID from user context/auth
@@ -58,6 +80,18 @@ export const NewBatchWizard: React.FC = () => {
   const handleCreateBatch = async () => {
     if (!uploadedFile) {
       alert('No hay archivo seleccionado');
+      return;
+    }
+
+    // Confirmación antes de crear
+    const confirmMessage = `¿Confirmar creación de campaña?\n\n` +
+      `Nombre: ${config.name}\n` +
+      `Contactos: ${uploadData?.total_rows || 0}\n` +
+      `Horario: ${config.start_hour} - ${config.end_hour}\n` +
+      `Intentos máximos: ${config.max_attempts}\n\n` +
+      `¿Deseas crear esta campaña?`;
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
 
@@ -86,11 +120,16 @@ export const NewBatchWizard: React.FC = () => {
       };
 
       await createBatchMutation.mutateAsync(batchRequest);
-      alert('¡Campaña creada exitosamente!');
-      // TODO: Navigate to batch detail page
+      
+      alert('¡Campaña creada exitosamente!\n\nLa campaña se ha creado y está lista para comenzar.');
+      
+      // Resetear todo el wizard después de crear exitosamente
+      resetWizard();
+      
+      // TODO: Navigate to batch detail page or batches list
     } catch (error) {
       console.error('Error creating batch:', error);
-      alert('Error al crear la campaña');
+      alert('Error al crear la campaña.\n\nPor favor, verifica los datos e intenta nuevamente.');
     }
   };
 

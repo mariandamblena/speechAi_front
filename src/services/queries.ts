@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import axios from 'axios';
 import { api } from './api';
 import {
@@ -85,15 +85,7 @@ const mapBackendAccountToFrontend = (backendAccount: any): AccountModel => {
       priority_support: false
     },
     settings: {
-      allowed_call_hours: {
-        start: '09:00',
-        end: '18:00'
-      },
-      timezone: 'America/Argentina/Buenos_Aires',
-      retry_settings: {
-        max_attempts: 3,
-        retry_delay_hours: 1
-      }
+      timezone: 'America/Argentina/Buenos_Aires'
     },
     api_token: 'token_placeholder',
     created_at: backendAccount.created_at,
@@ -317,14 +309,17 @@ export const useBatches = (params: {
   });
 };
 
-export const useBatch = (batchId: string) => {
+export const useBatch = (
+  batchId: string, 
+  options?: Pick<UseQueryOptions<BatchModel>, 'enabled'>
+) => {
   return useQuery({
     queryKey: ['batches', batchId],
     queryFn: async (): Promise<BatchModel> => {
       const response = await api.get(`/batches/${batchId}`);
       return response.data;
     },
-    enabled: !!batchId,
+    enabled: options?.enabled !== undefined ? options.enabled : !!batchId,
   });
 };
 
@@ -722,9 +717,13 @@ export const useCancelJob = () => {
       return response.data;
     },
     onSuccess: () => {
+      // Invalidar todas las queries relacionadas para actualizar contadores
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       queryClient.invalidateQueries({ queryKey: ['batch-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] }); // ← Para actualizar lista de batches
+      queryClient.invalidateQueries({ queryKey: ['batch'] }); // ← Para actualizar batch individual
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }); // ← Para actualizar dashboard
     },
   });
 };
@@ -748,9 +747,13 @@ export const useBulkDeleteJobs = () => {
       return { successful, failed, total: jobIds.length };
     },
     onSuccess: () => {
+      // Invalidar todas las queries relacionadas para actualizar contadores
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       queryClient.invalidateQueries({ queryKey: ['batch-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] }); // ← Para actualizar lista de batches
+      queryClient.invalidateQueries({ queryKey: ['batch'] }); // ← Para actualizar batch individual
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }); // ← Para actualizar dashboard
     },
   });
 };

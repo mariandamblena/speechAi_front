@@ -147,7 +147,20 @@ export interface BatchModel {
   recurring_config?: any;
   created_at: string;
   updated_at: string;
-  stats: {
+  
+  // Campos directos del backend (según API_FRONTEND_REFERENCE.md)
+  total_jobs?: number;
+  pending_jobs?: number;
+  completed_jobs?: number;
+  failed_jobs?: number;
+  suspended_jobs?: number;
+  total_cost?: number;
+  total_minutes?: number;
+  estimated_cost?: number;
+  is_active?: boolean;
+  
+  // Stats legacy (soporte para estructura antigua)
+  stats?: {
     total_contacts: number;
     calls_completed: number;
     calls_failed: number;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { BatchModel, JobModel } from '@/types';
-import { useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch, useBulkDeleteJobs } from '@/services/queries';
+import { useBatch, useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch, useBulkDeleteJobs } from '@/services/queries';
 import { JobDetailModal } from '@/components/jobs/JobDetailModal';
 import { Trash2, Filter, X } from 'lucide-react';
 
@@ -13,7 +13,7 @@ interface BatchDetailModalProps {
 }
 
 export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
-  batch,
+  batch: initialBatch,
   isOpen,
   onClose
 }) => {
@@ -32,6 +32,15 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [selectAll, setSelectAll] = useState(false);
 
   // TODOS los hooks deben estar antes de cualquier return condicional
+  // Obtener datos frescos del batch cuando está abierto
+  const { data: freshBatch } = useBatch(
+    initialBatch?.batch_id || '', 
+    { enabled: !!initialBatch && isOpen }
+  );
+  
+  // Usar el batch fresco si está disponible, sino el inicial
+  const batch = freshBatch || initialBatch;
+  
   const { data: jobs, isLoading: jobsLoading } = useBatchJobs(
     batch?.batch_id || '', 
     { enabled: !!batch && activeTab === 'jobs' }
@@ -108,16 +117,14 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   };
 
   const calculateProgress = () => {
-    if (!batch.stats) return 0;
-    const total = batch.stats.total_contacts;
-    const completed = batch.stats.calls_completed + batch.stats.calls_failed;
+    const total = batch.total_jobs || 0;
+    const completed = (batch.completed_jobs || 0) + (batch.failed_jobs || 0);
     return total > 0 ? Math.round((completed / total) * 100) : 0;
   };
 
   const calculateSuccessRate = () => {
-    if (!batch.stats) return 0;
-    const total = batch.stats.calls_completed + batch.stats.calls_failed;
-    return total > 0 ? Math.round((batch.stats.calls_completed / total) * 100) : 0;
+    const total = (batch.completed_jobs || 0) + (batch.failed_jobs || 0);
+    return total > 0 ? Math.round(((batch.completed_jobs || 0) / total) * 100) : 0;
   };
 
   const getDayName = (day: number) => {
@@ -126,28 +133,42 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   };
 
   const handlePause = async () => {
+    if (!confirm(`¿Estás seguro de que quieres pausar la campaña "${batch.name}"?\n\nLas llamadas en progreso se completarán, pero no se iniciarán nuevas llamadas hasta que la reactives.`)) {
+      return;
+    }
+    
     try {
       await pauseBatchMutation.mutateAsync(batch._id);
     } catch (error) {
       console.error('Error pausing batch:', error);
+      alert('Error al pausar la campaña. Por favor, intenta de nuevo.');
     }
   };
 
   const handleResume = async () => {
+    if (!confirm(`¿Estás seguro de que quieres reanudar la campaña "${batch.name}"?\n\nLas llamadas pendientes comenzarán a procesarse inmediatamente.`)) {
+      return;
+    }
+    
     try {
       await resumeBatchMutation.mutateAsync(batch._id);
     } catch (error) {
       console.error('Error resuming batch:', error);
+      alert('Error al reanudar la campaña. Por favor, intenta de nuevo.');
     }
   };
 
   const handleCancel = async () => {
-    if (window.confirm('¿Estás seguro de que quieres cancelar esta campaña?')) {
-      try {
-        await cancelBatchMutation.mutateAsync(batch._id);
-      } catch (error) {
-        console.error('Error canceling batch:', error);
-      }
+    if (!confirm(`⚠️ ¿Estás seguro de que quieres CANCELAR permanentemente la campaña "${batch.name}"?\n\nEsta acción NO se puede deshacer. Todas las llamadas pendientes serán canceladas.`)) {
+      return;
+    }
+    
+    try {
+      await cancelBatchMutation.mutateAsync(batch._id);
+      onClose(); // Cerrar el modal después de cancelar
+    } catch (error) {
+      console.error('Error canceling batch:', error);
+      alert('Error al cancelar la campaña. Por favor, intenta de nuevo.');
     }
   };
 
@@ -192,9 +213,19 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   };
 
   const handleEditConfig = () => {
+    if (!confirm('La edición de configuración está en desarrollo.\n\n¿Deseas continuar? (Se abrirá una alerta informativa)')) {
+      return;
+    }
     setIsEditingConfig(true);
-    // TODO: Implementar modal de edición o navegar a página de edición
-    alert('Funcionalidad de edición en desarrollo. Por ahora, puedes duplicar la campaña y crear una nueva con la configuración modificada.');
+    alert('Funcionalidad de edición en desarrollo.\n\nPor ahora, puedes:\n• Duplicar la campaña y crear una nueva con la configuración modificada\n• Pausar esta campaña y crear una nueva\n• Contactar al administrador para cambios urgentes');
+  };
+
+  const handleDuplicateBatch = () => {
+    if (!confirm(`¿Deseas duplicar la campaña "${batch.name}"?\n\nSe creará una nueva campaña con la misma configuración, lista para agregar nuevos contactos.`)) {
+      return;
+    }
+    
+    alert('Funcionalidad de duplicación en desarrollo.\n\nPróximamente podrás:\n• Duplicar la configuración de esta campaña\n• Agregar nuevos contactos\n• Modificar ajustes antes de iniciar');
   };
 
   // Manejar selección de todos
@@ -309,19 +340,19 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {batch.stats?.total_contacts || 0}
+                {batch.total_jobs || 0}
               </div>
               <div className="text-sm text-gray-500">Total Contactos</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {batch.stats?.calls_completed || 0}
+                {batch.completed_jobs || 0}
               </div>
               <div className="text-sm text-gray-500">Completadas</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {batch.stats?.calls_failed || 0}
+                {batch.failed_jobs || 0}
               </div>
               <div className="text-sm text-gray-500">Fallidas</div>
             </div>
@@ -706,7 +737,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 <Button variant="secondary" onClick={handleEditConfig}>
                   Editar Configuración
                 </Button>
-                <Button variant="primary">
+                <Button variant="primary" onClick={handleDuplicateBatch}>
                   Duplicar Campaña
                 </Button>
               </div>

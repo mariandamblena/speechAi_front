@@ -60,7 +60,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       newErrors.initial_credits = 'Los créditos iniciales deben ser mayor a 0';
     }
 
-    if (formData.plan_type === 'minutes_based' && formData.initial_minutes <= 0) {
+    if (formData.plan_type === 'minutes_based' && (formData.initial_minutes || 0) <= 0) {
       newErrors.initial_minutes = 'Los minutos iniciales deben ser mayor a 0';
     }
 

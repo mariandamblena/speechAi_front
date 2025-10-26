@@ -19,6 +19,34 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   isLoading,
   accounts
 }) => {
+  // Configuración inicial
+  const initialFormData: CreateBatchRequest = {
+    account_id: '',
+    name: '',
+    description: '',
+    priority: 1,
+    call_settings: {
+      max_call_duration: 300,
+      ring_timeout: 30,
+      max_attempts: 3,
+      retry_delay_hours: 24,
+      allowed_hours: {
+        start: '09:00',
+        end: '18:00'
+      },
+      days_of_week: [1, 2, 3, 4, 5],
+      timezone: 'America/Santiago'
+    },
+    allow_duplicates: false,
+    excel_file: undefined
+  };
+
+  const [formData, setFormData] = useState<CreateBatchRequest>(initialFormData);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [excelPreview, setExcelPreview] = useState<any[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
   // Log cuentas disponibles cuando el modal se abre
   React.useEffect(() => {
     if (isOpen && accounts) {
@@ -31,47 +59,75 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
     }
   }, [isOpen, accounts]);
 
-  const [formData, setFormData] = useState<CreateBatchRequest>({
-    account_id: '',
-    name: '',
-    description: '',
-    priority: 1, // 1=low, 2=normal, 3=high, 4=urgent
-    call_settings: {
-      max_call_duration: 300, // 5 minutos
-      ring_timeout: 30,
-      max_attempts: 3,
-      retry_delay_hours: 24,
-      allowed_hours: {
-        start: '09:00',
-        end: '18:00'
-      },
-      days_of_week: [1, 2, 3, 4, 5], // Lunes a Viernes
-      timezone: 'America/Santiago'
-    },
-    excel_file: null,
-    allow_duplicates: false // Default: no permitir duplicados
-  });
+  // Resetear formulario cuando se abre el modal
+  React.useEffect(() => {
+    if (isOpen) {
+      console.log('🔄 Reseteando modal con initialFormData:', initialFormData);
+      console.log('  - call_settings:', initialFormData.call_settings);
+      setFormData(initialFormData);
+      setCurrentStep(1);
+      setExcelPreview([]);
+      setErrors({});
+      setShowConfirmation(false);
+    }
+  }, [isOpen]);
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [excelPreview, setExcelPreview] = useState<any[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Log cuando cambia el paso para debugging
+  React.useEffect(() => {
+    console.log(`📍 Paso actual: ${currentStep}`);
+    if (currentStep === 3) {
+      console.group('🔧 PASO 3 - Estado de call_settings:');
+      console.log('formData.call_settings:', formData.call_settings);
+      if (formData.call_settings) {
+        console.log('  ✅ Tiene call_settings');
+        console.log('  - max_call_duration:', formData.call_settings.max_call_duration);
+        console.log('  - allowed_hours:', formData.call_settings.allowed_hours);
+        console.log('  - days_of_week:', formData.call_settings.days_of_week);
+      } else {
+        console.error('  ❌ NO tiene call_settings!');
+      }
+      console.groupEnd();
+    }
+  }, [currentStep, formData.call_settings]);
 
   const handleInputChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof CreateBatchRequest],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
+    const parts = field.split('.');
+    
+    setFormData(prev => {
+      if (parts.length === 1) {
+        // Campo simple: account_id, name, etc.
+        return {
+          ...prev,
+          [field]: value
+        };
+      } else if (parts.length === 2) {
+        // Campo de segundo nivel: call_settings.max_call_duration
+        const [parent, child] = parts;
+        const parentObj = prev[parent as keyof CreateBatchRequest];
+        return {
+          ...prev,
+          [parent]: {
+            ...(typeof parentObj === 'object' && parentObj !== null ? parentObj : {}),
+            [child]: value
+          }
+        };
+      } else if (parts.length === 3) {
+        // Campo de tercer nivel: call_settings.allowed_hours.start
+        const [parent, middle, child] = parts;
+        const parentObj = prev[parent as keyof CreateBatchRequest] as any;
+        return {
+          ...prev,
+          [parent]: {
+            ...(typeof parentObj === 'object' && parentObj !== null ? parentObj : {}),
+            [middle]: {
+              ...(parentObj && typeof parentObj[middle] === 'object' ? parentObj[middle] : {}),
+              [child]: value
+            }
+          }
+        };
+      }
+      return prev;
+    });
     
     // Clear error when user starts typing
     if (errors[field]) {
@@ -156,29 +212,103 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateStep(currentStep)) {
-      console.group('📤 Enviando batch con datos:');
-      console.log('Form Data completo:', formData);
-      console.log('account_id:', formData.account_id);
-      console.log('account_id tipo:', typeof formData.account_id);
-      console.log('name:', formData.name);
-      console.log('excel_file:', formData.excel_file?.name);
-      console.log('Call Settings (will be JSON stringified):', formData.call_settings);
-      
-      // Validación crítica
-      if (!formData.account_id || formData.account_id === 'string' || formData.account_id === '') {
-        console.error('❌ ERROR: account_id inválido:', formData.account_id);
-        console.error('💡 SOLUCIÓN: Debes seleccionar una cuenta del dropdown en el Step 1');
-        console.error('📋 Cuentas disponibles:', accounts?.length || 0);
-        alert('❌ Error: Debes seleccionar una cuenta válida del dropdown en el Step 1.\n\n' + 
-              'El campo "Cuenta de Cliente" no puede estar vacío.\n\n' +
-              `Cuentas disponibles: ${accounts?.length || 0}`);
-        console.groupEnd();
-        return;
-      }
-      
+    
+    console.log('🔍 handleSubmit llamado - currentStep:', currentStep, 'isLoading:', isLoading);
+    
+    // Solo permitir submit en el último paso (paso 3)
+    if (currentStep < 3) {
+      console.log('📌 currentStep < 3, llamando handleNext()');
+      handleNext();
+      return;
+    }
+
+    // Si ya está cargando, no hacer nada
+    if (isLoading) {
+      console.log('⚠️ Ya está cargando, ignorando submit');
+      return;
+    }
+
+    // Validar que TODOS los pasos anteriores estén completos
+    const paso1Valid = validateStep(1);
+    const paso2Valid = validateStep(2);
+    const paso3Valid = validateStep(3);
+
+    if (!paso1Valid) {
+      alert('❌ Error: Debes completar correctamente el Paso 1 (Información Básica).\n\nPor favor, vuelve atrás y verifica que hayas seleccionado una cuenta y un nombre válido.');
+      return;
+    }
+
+    if (!paso2Valid) {
+      alert('❌ Error: Debes completar correctamente el Paso 2 (Contactos).\n\nPor favor, vuelve atrás y verifica que hayas cargado un archivo Excel válido.');
+      return;
+    }
+
+    if (!paso3Valid) {
+      alert('❌ Error: Debes completar correctamente el Paso 3 (Configuración).\n\nPor favor, verifica todos los campos de configuración.');
+      return;
+    }
+    
+    console.group('📤 Validando datos antes de confirmar:');
+    console.log('Form Data completo:', formData);
+    console.log('account_id:', formData.account_id);
+    console.log('account_id tipo:', typeof formData.account_id);
+    console.log('name:', formData.name);
+    console.log('excel_file:', formData.excel_file?.name);
+    console.log('Call Settings (will be JSON stringified):', formData.call_settings);
+    
+    // Validación crítica adicional
+    if (!formData.account_id || formData.account_id === 'string' || formData.account_id === '') {
+      console.error('❌ ERROR: account_id inválido:', formData.account_id);
+      console.error('💡 SOLUCIÓN: Debes seleccionar una cuenta del dropdown en el Step 1');
+      console.error('📋 Cuentas disponibles:', accounts?.length || 0);
+      alert('❌ Error: Debes volver al Paso 1 y seleccionar una cuenta válida del dropdown.\n\n' + 
+            'El campo "Cuenta de Cliente" no puede estar vacío.\n\n' +
+            `Cuentas disponibles: ${accounts?.length || 0}`);
       console.groupEnd();
-      onSubmit(formData);
+      return;
+    }
+
+    if (!formData.excel_file) {
+      alert('❌ Error: Debes volver al Paso 2 y cargar un archivo Excel con los contactos.');
+      console.groupEnd();
+      return;
+    }
+    
+    console.groupEnd();
+
+    // TODO VALIDADO - Mostrar modal de confirmación
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmCreate = () => {
+    console.group('✅ CONFIRMACIÓN - Enviando datos al backend:');
+    console.log('📋 FormData completo:', formData);
+    console.log('🔧 call_settings:', formData.call_settings);
+    console.log('📞 max_call_duration:', formData.call_settings?.max_call_duration);
+    console.log('⏰ allowed_hours:', formData.call_settings?.allowed_hours);
+    console.log('📅 days_of_week:', formData.call_settings?.days_of_week);
+    console.log('🌍 timezone:', formData.call_settings?.timezone);
+    console.log('📁 excel_file:', formData.excel_file?.name);
+    console.log('🏢 account_id:', formData.account_id);
+    console.groupEnd();
+    
+    setShowConfirmation(false);
+    onSubmit(formData);
+  };
+
+  const handleCancelCreate = () => {
+    setShowConfirmation(false);
+  };
+
+  // Prevenir submit con Enter en los inputs
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') {
+      e.preventDefault();
+      // Si estamos en un paso anterior al 3, avanzar
+      if (currentStep < 3) {
+        handleNext();
+      }
+      // Si estamos en el paso 3, no hacer nada (el usuario debe hacer clic en el botón)
     }
   };
 
@@ -194,8 +324,9 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crear Nueva Campaña" size="xl">
-      <div className="space-y-6">
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title="Crear Nueva Campaña" size="xl">
+        <div className="space-y-6">
         {/* Steps Header */}
         <div className="flex items-center justify-between">
           {steps.map((step, index) => (
@@ -222,7 +353,17 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6 relative">
+          {/* Overlay de carga cuando isLoading es true */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center rounded-lg">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-700 font-medium">Creando campaña...</p>
+              </div>
+            </div>
+          )}
+
           {/* Step 1: Información Básica */}
           {currentStep === 1 && (
             <div className="space-y-4">
@@ -525,5 +666,104 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
         </form>
       </div>
     </Modal>
+
+    {/* Modal de confirmación */}
+    <ConfirmationModal
+      isOpen={showConfirmation}
+      onConfirm={handleConfirmCreate}
+      onCancel={handleCancelCreate}
+      formData={formData}
+      excelPreview={excelPreview}
+      accounts={accounts}
+    />
+    </>
+  );
+};
+
+// Modal de confirmación interno
+const ConfirmationModal: React.FC<{
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  formData: CreateBatchRequest;
+  excelPreview: any[];
+  accounts: AccountModel[];
+}> = ({ isOpen, onConfirm, onCancel, formData, excelPreview, accounts }) => {
+  if (!isOpen) return null;
+
+  const selectedAccount = accounts.find(acc => acc.account_id === formData.account_id);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel}></div>
+      
+      {/* Modal */}
+      <div className="relative bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full mx-4 transform transition-all">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <span className="text-3xl">⚠️</span>
+          Confirmar Creación de Campaña
+        </h2>
+        
+        <div className="space-y-3 mb-6">
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Cuenta:</span>
+            <span className="text-gray-900">{selectedAccount?.account_name || 'No especificada'}</span>
+          </div>
+          
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Nombre:</span>
+            <span className="text-gray-900">{formData.name}</span>
+          </div>
+          
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Contactos:</span>
+            <span className="text-gray-900">
+              {excelPreview.length > 0 ? `${excelPreview.length} contactos` : 'No cargados'}
+            </span>
+          </div>
+          
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Horario:</span>
+            <span className="text-gray-900">
+              {formData.call_settings?.allowed_hours?.start || '09:00'} - {formData.call_settings?.allowed_hours?.end || '18:00'}
+            </span>
+          </div>
+          
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Intentos máx:</span>
+            <span className="text-gray-900">{formData.call_settings?.max_attempts || 3}</span>
+          </div>
+          
+          <div className="flex items-start">
+            <span className="font-medium text-gray-700 w-32">Duplicados:</span>
+            <span className="text-gray-900">{formData.allow_duplicates ? 'Permitidos' : 'No permitidos'}</span>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+          <p className="text-sm text-blue-800 font-medium">
+            ¿Estás seguro de que deseas crear esta campaña con la configuración mostrada?
+          </p>
+        </div>
+        
+        <div className="flex gap-4">
+          <Button
+            onClick={onCancel}
+            variant="secondary"
+            className="flex-1 py-3 text-base font-medium"
+          >
+            ❌ Cancelar
+          </Button>
+          <Button
+            onClick={onConfirm}
+            variant="primary"
+            className="flex-1 py-3 text-base font-medium bg-green-600 hover:bg-green-700"
+          >
+            ✓ Sí, Crear Campaña
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
