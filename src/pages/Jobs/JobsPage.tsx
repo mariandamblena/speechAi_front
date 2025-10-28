@@ -255,6 +255,9 @@ export const JobsPage: React.FC = () => {
                     Estado
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Compromiso
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Intentos
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -294,6 +297,32 @@ export const JobsPage: React.FC = () => {
                       >
                         {getStatusText(job.status)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {job.fecha_pago_cliente ? (
+                        <div className="flex flex-col space-y-1">
+                          <div className="flex items-center">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              💰 Sí
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            📅 {new Date(job.fecha_pago_cliente).toLocaleDateString('es-ES', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                          {job.monto_pago_cliente && (
+                            <div className="text-xs font-semibold text-green-700">
+                              ${job.monto_pago_cliente.toLocaleString('es-CL')}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          —
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

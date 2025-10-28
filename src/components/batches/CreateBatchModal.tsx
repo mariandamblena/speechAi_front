@@ -385,11 +385,18 @@ export const CreateBatchModal: React.FC<CreateBatchModalProps> = ({
                 >
                   <option value="">⚠️ Seleccionar cuenta...</option>
                   {accounts && accounts.length > 0 ? (
-                    accounts.map((account) => (
-                      <option key={account.account_id} value={account.account_id}>
-                        {account.account_name} ({account.balance?.credits || 0} créditos)
-                      </option>
-                    ))
+                    accounts.map((account) => {
+                      // 🔧 Mostrar el saldo correcto según el tipo de plan
+                      const balanceDisplay = account.plan_type === 'credit_based'
+                        ? `${account.balance?.credits || 0} créditos`
+                        : `${account.balance?.minutes || 0} minutos`;
+                      
+                      return (
+                        <option key={account.account_id} value={account.account_id}>
+                          {account.account_name} ({balanceDisplay})
+                        </option>
+                      );
+                    })
                   ) : (
                     <option value="" disabled>No hay cuentas disponibles</option>
                   )}

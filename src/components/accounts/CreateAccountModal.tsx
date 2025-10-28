@@ -22,6 +22,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     contact_email: '',
     contact_name: '',
     contact_phone: '',
+    country: 'CL', // 🆕 País por defecto: Chile
     plan_type: 'credit_based',
     initial_credits: 1000,
     initial_minutes: 0,
@@ -80,6 +81,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         account_name: formData.account_name,
         contact_name: formData.contact_name,
         contact_email: formData.contact_email,
+        country: formData.country, // 🆕 País requerido para normalización de teléfonos
         plan_type: formData.plan_type,
         features: {
           max_concurrent_calls: formData.features.max_concurrent_calls,
@@ -119,6 +121,23 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  // 🆕 Función para cambiar el país y actualizar automáticamente el timezone
+  const handleCountryChange = (country: 'CL' | 'AR') => {
+    const timezoneByCountry = {
+      'CL': 'America/Santiago',
+      'AR': 'America/Argentina/Buenos_Aires'
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      country,
+      settings: {
+        ...prev.settings,
+        timezone: timezoneByCountry[country]
+      }
+    }));
   };
 
   const handleFeatureChange = (feature: string, value: boolean) => {
@@ -265,24 +284,76 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         <div className="space-y-4">
           <h3 className="text-lg font-medium text-gray-900">Configuración Regional</h3>
           
+          {/* 🆕 Selector de País */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              País <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleCountryChange('CL')}
+                className={`flex items-center justify-center p-4 border-2 rounded-lg transition-all ${
+                  formData.country === 'CL'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <span className="text-3xl mr-3">🇨🇱</span>
+                <div className="text-left">
+                  <div className="font-semibold">Chile</div>
+                  <div className="text-xs text-gray-500">+56</div>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => handleCountryChange('AR')}
+                className={`flex items-center justify-center p-4 border-2 rounded-lg transition-all ${
+                  formData.country === 'AR'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <span className="text-3xl mr-3">🇦🇷</span>
+                <div className="text-left">
+                  <div className="font-semibold">Argentina</div>
+                  <div className="text-xs text-gray-500">+54</div>
+                </div>
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              🔔 Este campo es <strong>requerido</strong> para normalizar correctamente los números de teléfono
+            </p>
+          </div>
+
+          {/* Timezone auto-actualizado según país */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Zona Horaria por Defecto
+              Zona Horaria {formData.country === 'CL' ? '🇨🇱' : '🇦🇷'}
             </label>
             <select
               value={formData.settings.timezone}
               onChange={(e) => handleSettingChange('timezone', e.target.value)}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
-              <option value="America/Santiago">Santiago (GMT-3)</option>
-              <option value="America/Argentina/Buenos_Aires">Buenos Aires (GMT-3)</option>
-              <option value="America/Sao_Paulo">São Paulo (GMT-3)</option>
-              <option value="America/Lima">Lima (GMT-5)</option>
-              <option value="America/Bogota">Bogotá (GMT-5)</option>
-              <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
+              {formData.country === 'CL' ? (
+                <>
+                  <option value="America/Santiago">Santiago (GMT-3)</option>
+                  <option value="America/Punta_Arenas">Punta Arenas (GMT-3)</option>
+                  <option value="Pacific/Easter">Isla de Pascua (GMT-5)</option>
+                </>
+              ) : (
+                <>
+                  <option value="America/Argentina/Buenos_Aires">Buenos Aires (GMT-3)</option>
+                  <option value="America/Argentina/Cordoba">Córdoba (GMT-3)</option>
+                  <option value="America/Argentina/Mendoza">Mendoza (GMT-3)</option>
+                  <option value="America/Argentina/Ushuaia">Ushuaia (GMT-3)</option>
+                </>
+              )}
             </select>
             <p className="mt-1 text-sm text-gray-500">
-              Esta será la zona horaria predeterminada para las campañas de esta cuenta
+              ✅ Auto-actualizado según el país seleccionado
             </p>
           </div>
         </div>

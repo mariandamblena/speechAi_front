@@ -23,6 +23,7 @@ export interface AccountModel {
   contact_name: string;
   contact_email: string;
   contact_phone?: string;
+  country: 'CL' | 'AR'; // 🆕 País para normalización de teléfonos
   status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
   plan_type: 'minutes_based' | 'credit_based';
   balance: {
@@ -79,6 +80,25 @@ export interface JobModel {
   created_at: string;
   started_at?: string;
   updated_at?: string;
+  
+  // 🆕 Campos del contacto (guardados en raíz del job)
+  nombre?: string;
+  rut?: string;
+  rut_fmt?: string;
+  to_number?: string;
+  
+  // 🆕 Campos de deuda (desde payload, guardados en raíz)
+  monto_total?: number;
+  deuda?: number;
+  fecha_limite?: string;
+  origen_empresa?: string;
+  cantidad_cupones?: number;
+  fecha_maxima?: string;
+  
+  // 🆕 Variables de compromiso de pago (collected_dynamic_variables de Retell)
+  fecha_pago_cliente?: string; // Fecha en que el cliente promete pagar
+  monto_pago_cliente?: number; // Monto que el cliente promete pagar
+  
   call_result?: {
     success: boolean;
     status: string;
@@ -97,11 +117,26 @@ export interface JobModel {
       };
       recording_url?: string;
       public_log_url?: string;
+      transcript?: string;
+      // Variables colectadas durante la llamada (también disponibles en raíz del job)
+      collected_dynamic_variables?: {
+        fecha_pago_cliente?: string;
+        monto_pago_cliente?: number | string;
+        [key: string]: any;
+      };
     };
   };
   call_id?: string;
   call_duration_seconds?: number;
   last_error?: string;
+  
+  // 🆕 Campos de estado de llamada
+  worker_id?: string;
+  call_started_at?: string;
+  call_ended_at?: string;
+  is_calling?: boolean;
+  finished_at?: string;
+  reserved_until?: string;
 }
 
 export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled' | 'done';
@@ -199,6 +234,7 @@ export interface CreateAccountRequest {
   plan_type: 'minutes_based' | 'credit_based';
   initial_minutes?: number;
   initial_credits?: number;
+  country: 'CL' | 'AR'; // 🆕 REQUERIDO - País para normalización de teléfonos
   features: {
     max_concurrent_calls: number;
     voice_cloning: boolean;
