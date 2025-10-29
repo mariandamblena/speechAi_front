@@ -88,6 +88,7 @@ const mapBackendAccountToFrontend = (backendAccount: any): AccountModel => {
       timezone: 'America/Argentina/Buenos_Aires'
     },
     api_token: 'token_placeholder',
+    country: 'AR' as 'CL' | 'AR', // Agregar campo faltante
     created_at: backendAccount.created_at,
     updated_at: backendAccount.updated_at
   };

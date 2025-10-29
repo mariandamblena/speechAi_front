@@ -299,30 +299,40 @@ export const JobsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {job.fecha_pago_cliente ? (
-                        <div className="flex flex-col space-y-1">
-                          <div className="flex items-center">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              💰 Sí
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-600">
-                            📅 {new Date(job.fecha_pago_cliente).toLocaleDateString('es-ES', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </div>
-                          {job.monto_pago_cliente && (
-                            <div className="text-xs font-semibold text-green-700">
-                              ${job.monto_pago_cliente.toLocaleString('es-CL')}
+                      {(() => {
+                        // 🔧 Extraer variables de compromiso desde collected_dynamic_variables
+                        const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
+                        const fechaPago = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente;
+                        const montoPago = job.monto_pago_cliente || 
+                          (typeof dynamicVars?.monto_pago_cliente === 'string' 
+                            ? parseFloat(dynamicVars.monto_pago_cliente) 
+                            : dynamicVars?.monto_pago_cliente);
+
+                        return fechaPago ? (
+                          <div className="flex flex-col space-y-1">
+                            <div className="flex items-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                💰 Sí
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          —
-                        </span>
-                      )}
+                            <div className="text-xs text-gray-600">
+                              📅 {new Date(fechaPago).toLocaleDateString('es-ES', { 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}
+                            </div>
+                            {montoPago && (
+                              <div className="text-xs font-semibold text-green-700">
+                                ${montoPago.toLocaleString('es-CL')}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            —
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

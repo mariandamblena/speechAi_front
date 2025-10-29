@@ -11,13 +11,13 @@ interface JobDetailModalProps {
 export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onClose }) => {
   if (!isOpen || !job) return null;
 
-  // 🔍 Debug: Log completo del job para ver todos los campos disponibles
-  console.group('🔍 JobDetailModal - Datos del Job');
-  console.log('Job completo:', job);
-  console.log('fecha_pago_cliente:', job.fecha_pago_cliente);
-  console.log('monto_pago_cliente:', job.monto_pago_cliente);
-  console.log('call_result?.summary?.collected_dynamic_variables:', job.call_result?.summary?.collected_dynamic_variables);
-  console.groupEnd();
+  // � Extraer variables de compromiso desde collected_dynamic_variables si no están en raíz
+  const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
+  const fechaPagoCliente = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente;
+  const montoPagoCliente = job.monto_pago_cliente || 
+    (typeof dynamicVars?.monto_pago_cliente === 'string' 
+      ? parseFloat(dynamicVars.monto_pago_cliente) 
+      : dynamicVars?.monto_pago_cliente);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES');
@@ -215,7 +215,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
         </div>
 
         {/* 🆕 Compromiso de Pago del Cliente */}
-        {(job.fecha_pago_cliente || job.monto_pago_cliente) && (
+        {(fechaPagoCliente || montoPagoCliente) ? (
           <div className="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 p-6 rounded-lg shadow-md">
             <div className="flex items-center mb-4">
               <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mr-4">
@@ -226,11 +226,11 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
               <h3 className="text-xl font-bold text-green-800">💰 Compromiso de Pago</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {job.fecha_pago_cliente && (
+              {fechaPagoCliente && (
                 <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
                   <span className="block text-sm font-medium text-gray-600 mb-2">📅 Fecha Prometida</span>
                   <span className="block text-2xl font-bold text-green-700">
-                    {new Date(job.fecha_pago_cliente).toLocaleDateString('es-ES', { 
+                    {new Date(fechaPagoCliente).toLocaleDateString('es-ES', { 
                       weekday: 'long', 
                       year: 'numeric', 
                       month: 'long', 
@@ -239,18 +239,18 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
                   </span>
                 </div>
               )}
-              {job.monto_pago_cliente && (
+              {montoPagoCliente && (
                 <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
                   <span className="block text-sm font-medium text-gray-600 mb-2">💵 Monto Prometido</span>
                   <span className="block text-2xl font-bold text-green-700">
-                    {formatCurrency(job.monto_pago_cliente)}
+                    {formatCurrency(montoPagoCliente)}
                   </span>
-                  {job.monto_total && job.monto_pago_cliente === job.monto_total && (
+                  {job.monto_total && montoPagoCliente === job.monto_total && (
                     <span className="inline-flex items-center mt-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       ✓ Pago total
                     </span>
                   )}
-                  {job.monto_total && job.monto_pago_cliente < job.monto_total && (
+                  {job.monto_total && montoPagoCliente < job.monto_total && (
                     <span className="inline-flex items-center mt-2 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                       ⚠️ Pago parcial
                     </span>
@@ -264,68 +264,27 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
               </p>
             </div>
           </div>
+        ) : job.call_result?.success && (
+          <div className="mt-6 bg-blue-50 border-2 border-blue-300 p-6 rounded-lg">
+            <div className="flex items-center mb-2">
+              <svg className="w-6 h-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-lg font-semibold text-blue-900">ℹ️ Compromiso de Pago No Disponible</h3>
+            </div>
+            <p className="text-sm text-blue-800">
+              Los datos de compromiso de pago no están disponibles en esta llamada. Esto puede ocurrir si:
+            </p>
+            <ul className="mt-2 text-sm text-blue-800 list-disc list-inside space-y-1">
+              <li>El cliente no confirmó una fecha o monto de pago específico</li>
+              <li>La llamada terminó antes de capturar esta información</li>
+              <li>El backend no devolvió estos campos en la respuesta del API</li>
+            </ul>
+            <p className="mt-3 text-xs text-blue-700 font-mono bg-blue-100 p-2 rounded">
+              🔧 Nota técnica: Los campos fecha_pago_cliente y monto_pago_cliente no están incluidos en la respuesta del endpoint GET /jobs
+            </p>
+          </div>
         )}
-
-        {/* 🔍 DEBUG: Sección temporal para verificar datos */}
-        <div className="mt-6 bg-yellow-50 border-2 border-yellow-300 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-yellow-900 mb-3">🔍 Debug - Campos del Job</h3>
-          <div className="space-y-2 text-sm font-mono">
-            <div>
-              <strong>fecha_pago_cliente:</strong> 
-              <span className={job.fecha_pago_cliente ? "text-green-700 ml-2" : "text-red-700 ml-2"}>
-                {job.fecha_pago_cliente || "❌ No disponible"}
-              </span>
-            </div>
-            <div>
-              <strong>monto_pago_cliente:</strong> 
-              <span className={job.monto_pago_cliente ? "text-green-700 ml-2" : "text-red-700 ml-2"}>
-                {job.monto_pago_cliente || "❌ No disponible"}
-              </span>
-            </div>
-            <div>
-              <strong>monto_total:</strong> 
-              <span className={job.monto_total ? "text-green-700 ml-2" : "text-red-700 ml-2"}>
-                {job.monto_total || "❌ No disponible"}
-              </span>
-            </div>
-            <div>
-              <strong>collected_dynamic_variables:</strong> 
-              <span className="text-blue-700 ml-2">
-                {job.call_result?.summary?.collected_dynamic_variables 
-                  ? JSON.stringify(job.call_result.summary.collected_dynamic_variables, null, 2)
-                  : "❌ No disponible"}
-              </span>
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-yellow-800">
-            📝 Esta sección es temporal para debugging. Abre la consola del navegador para ver el objeto completo.
-          </p>
-        </div>
-
-        {/* Información Técnica */}
-        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Información Técnica</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-gray-700">Job ID:</span>
-              <p className="text-gray-900 font-mono text-xs">{job.job_id}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Batch ID:</span>
-              <p className="text-gray-900 font-mono text-xs">{job.batch_id}</p>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Account ID:</span>
-              <p className="text-gray-900 font-mono text-xs">{job.account_id}</p>
-            </div>
-            {job.call_id && (
-              <div>
-                <span className="font-medium text-gray-700">Call ID:</span>
-                <p className="text-gray-900 font-mono text-xs">{job.call_id}</p>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Botones de acción */}
         <div className="mt-6 flex justify-end space-x-3">

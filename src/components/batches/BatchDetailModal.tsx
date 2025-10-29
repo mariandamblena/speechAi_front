@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { BatchModel, JobModel } from '@/types';
-import { useBatch, useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch, useBulkDeleteJobs } from '@/services/queries';
+import { useBatch, useBatchJobs, usePauseBatch, useResumeBatch, useCancelBatch, useBulkDeleteJobs, useCreateBatch, useUpdateBatch } from '@/services/queries';
 import { JobDetailModal } from '@/components/jobs/JobDetailModal';
 import { Trash2, Filter, X } from 'lucide-react';
+import { Input } from '@/components/ui/Input';
 
 interface BatchDetailModalProps {
   batch: BatchModel | null;
@@ -17,15 +18,28 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   isOpen,
   onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'settings' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'settings'>('overview');
   const [selectedJob, setSelectedJob] = useState<JobModel | null>(null);
   const [isJobDetailOpen, setIsJobDetailOpen] = useState(false);
   const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // Estados para edición de configuración
+  const [editedCallSettings, setEditedCallSettings] = useState({
+    max_call_duration: 0,
+    ring_timeout: 0,
+    max_attempts: 0,
+    retry_delay_hours: 0,
+  });
   
   // Filtros
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   
   // Selección múltiple
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
@@ -50,6 +64,8 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const pauseBatchMutation = usePauseBatch();
   const resumeBatchMutation = useResumeBatch();
   const cancelBatchMutation = useCancelBatch();
+  const createBatchMutation = useCreateBatch();
+  const updateBatchMutation = useUpdateBatch();
 
   // Filtrar jobs - useMemo también debe estar antes del return
   const filteredJobs = React.useMemo(() => {
@@ -62,18 +78,69 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       filtered = filtered.filter((job: any) => job.status === statusFilter);
     }
     
-    // Filtro por búsqueda (nombre o teléfono)
+    // Filtro por búsqueda (nombre, RUT o teléfono)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((job: any) => {
-        const name = (job.contact?.name || '').toLowerCase();
-        const phone = (job.contact?.phones?.[0] || '').toLowerCase();
-        return name.includes(query) || phone.includes(query);
+        const name = (job.nombre || job.contact?.name || '').toLowerCase();
+        const phone = (job.to_number || job.contact?.phones?.[0] || '').toLowerCase();
+        const rut = (job.rut || job.rut_fmt || job.contact?.dni || '').toLowerCase();
+        return name.includes(query) || phone.includes(query) || rut.includes(query);
       });
     }
     
     return filtered;
   }, [jobs, statusFilter, searchQuery]);
+
+  // Paginación
+  const paginatedJobs = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredJobs.slice(startIndex, endIndex);
+  }, [filteredJobs, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+
+  // Reset a página 1 cuando cambian los filtros
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery]);
+
+  // Calcular estadísticas reales desde los jobs
+  const realStats = React.useMemo(() => {
+    if (!jobs || !Array.isArray(jobs)) {
+      return {
+        pending: 0,
+        completed: 0,
+        failed: 0,
+        totalDuration: 0,
+        avgDuration: 0
+      };
+    }
+
+    const pending = jobs.filter((j: any) => j.status === 'pending').length;
+    const completed = jobs.filter((j: any) => j.status === 'completed' || j.status === 'done').length;
+    const failed = jobs.filter((j: any) => j.status === 'failed').length;
+    
+    // Calcular duración total en segundos
+    let totalDurationSeconds = 0;
+    jobs.forEach((j: any) => {
+      const duration = j.call_duration_seconds || 
+                      (j.call_result?.summary?.duration_ms ? Math.round(j.call_result.summary.duration_ms / 1000) : 0);
+      totalDurationSeconds += duration;
+    });
+    
+    const avgDuration = completed > 0 ? Math.round(totalDurationSeconds / completed) : 0;
+    const totalMinutes = totalDurationSeconds / 60;
+
+    return {
+      pending,
+      completed,
+      failed,
+      totalDuration: totalMinutes,
+      avgDuration
+    };
+  }, [jobs]);
 
   // AHORA sí podemos hacer el return condicional
   if (!batch) return null;
@@ -183,25 +250,78 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       return;
     }
 
-    // Crear CSV
-    const headers = ['Contacto', 'Teléfono', 'Estado', 'Intentos', 'Duración (s)', 'Fecha', 'Costo'];
-    const rows = jobs.map((job: any) => [
-      job.contact?.name || 'N/A',
-      job.contact?.phones?.[0] || 'N/A',
-      job.status,
-      `${job.attempts || 0}/${job.max_attempts || 3}`,
-      job.call_duration_seconds || 0,
-      new Date(job.created_at).toLocaleDateString(),
-      job.estimated_cost || 0
-    ]);
+    // Crear CSV con detalle completo
+    const headers = [
+      'Contacto', 'RUT', 'Teléfono', 'Estado', 'Intentos', 'Duración (s)', 'Fecha',
+      'Empresa', 'Monto Deuda', 'Fecha Límite', 'Cupones',
+      'Fecha Pago Prometido', 'Monto Pago Prometido', 'Tipo Pago',
+      'Éxito', 'Estado Llamada', 'Costo', 'Resumen',
+      'Link Grabación', 'Link Transcripción'
+    ];
+    
+    const rows = jobs.map((job: any) => {
+      // Extraer compromiso de pago
+      const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
+      const fechaPago = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente || '';
+      const montoPago = job.monto_pago_cliente || 
+        (typeof dynamicVars?.monto_pago_cliente === 'string' 
+          ? parseFloat(dynamicVars.monto_pago_cliente) 
+          : dynamicVars?.monto_pago_cliente) || '';
+      
+      // Determinar tipo de pago
+      let tipoPago = '';
+      if (fechaPago && montoPago) {
+        const montoTotal = job.monto_total || job.payload?.debt_amount || 0;
+        tipoPago = montoPago >= montoTotal ? 'Pago total' : 'Pago parcial';
+      }
+      
+      // Formatear fecha de pago
+      let fechaPagoFormateada = '';
+      if (fechaPago) {
+        try {
+          fechaPagoFormateada = new Date(fechaPago).toLocaleDateString('es-ES', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        } catch {
+          fechaPagoFormateada = fechaPago;
+        }
+      }
+      
+      return [
+        job.nombre || job.contact?.name || 'N/A',
+        job.rut || job.rut_fmt || 'N/A',
+        job.to_number || job.contact?.phones?.[0] || 'N/A',
+        job.status,
+        `${job.attempts || 0}/${job.max_attempts || 3}`,
+        job.call_duration_seconds || job.call_result?.summary?.duration_ms ? Math.round(job.call_result.summary.duration_ms / 1000) : 0,
+        new Date(job.created_at).toLocaleDateString('es-CL'),
+        job.origen_empresa || job.payload?.company_name || 'N/A',
+        job.monto_total || job.deuda || job.payload?.debt_amount || 0,
+        job.fecha_limite || job.payload?.due_date || 'N/A',
+        job.cantidad_cupones || job.payload?.additional_info?.cantidad_cupones || 'N/A',
+        fechaPagoFormateada,
+        montoPago ? `$${montoPago.toLocaleString('es-CL')}` : '',
+        tipoPago,
+        job.call_result?.success ? 'Sí' : 'No',
+        job.call_result?.summary?.call_status || 'N/A',
+        job.call_result?.summary?.call_cost?.combined_cost || job.estimated_cost || 0,
+        (job.call_result?.summary?.call_analysis?.call_summary || '').replace(/\n/g, ' ').replace(/"/g, '""'),
+        job.call_result?.summary?.recording_url || '',
+        job.call_result?.summary?.public_log_url || ''
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
-    // Descargar archivo
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Descargar archivo con BOM para Excel
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -213,19 +333,65 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   };
 
   const handleEditConfig = () => {
-    if (!confirm('La edición de configuración está en desarrollo.\n\n¿Deseas continuar? (Se abrirá una alerta informativa)')) {
-      return;
-    }
-    setIsEditingConfig(true);
-    alert('Funcionalidad de edición en desarrollo.\n\nPor ahora, puedes:\n• Duplicar la campaña y crear una nueva con la configuración modificada\n• Pausar esta campaña y crear una nueva\n• Contactar al administrador para cambios urgentes');
+    if (!batch) return;
+    
+    // Inicializar formulario con valores actuales
+    setEditedCallSettings({
+      max_call_duration: batch.call_settings?.max_call_duration || 0,
+      ring_timeout: batch.call_settings?.ring_timeout || 0,
+      max_attempts: batch.call_settings?.max_attempts || 0,
+      retry_delay_hours: batch.call_settings?.retry_delay_hours || 0,
+    });
+    
+    setIsEditModalOpen(true);
   };
 
-  const handleDuplicateBatch = () => {
+  const handleSaveConfig = async () => {
+    if (!batch) return;
+    
+    try {
+      await updateBatchMutation.mutateAsync({
+        batchId: batch.batch_id,
+        updates: {
+          // Aquí solo podemos actualizar campos permitidos por el backend
+          // Según useUpdateBatch, solo permite: is_active, name, description, priority
+          name: batch.name, // Mantener igual por ahora
+          description: batch.description,
+          priority: batch.priority === 'low' ? 1 : batch.priority === 'normal' ? 2 : batch.priority === 'high' ? 3 : 4,
+        }
+      });
+      
+      alert('⚠️ Nota: La API actual solo permite editar nombre, descripción y prioridad.\n\nPara cambiar configuraciones de llamada, debes duplicar la campaña y crear una nueva.');
+      setIsEditModalOpen(false);
+    } catch (error) {
+      console.error('Error al actualizar configuración:', error);
+      alert('Error al guardar la configuración');
+    }
+  };
+
+  const handleDuplicateBatch = async () => {
+    if (!batch) return;
+    
     if (!confirm(`¿Deseas duplicar la campaña "${batch.name}"?\n\nSe creará una nueva campaña con la misma configuración, lista para agregar nuevos contactos.`)) {
       return;
     }
     
-    alert('Funcionalidad de duplicación en desarrollo.\n\nPróximamente podrás:\n• Duplicar la configuración de esta campaña\n• Agregar nuevos contactos\n• Modificar ajustes antes de iniciar');
+    try {
+      const newBatch = await createBatchMutation.mutateAsync({
+        account_id: batch.account_id,
+        name: `${batch.name} (Copia)`,
+        description: batch.description || 'Copia de campaña',
+        priority: batch.priority === 'low' ? 1 : batch.priority === 'normal' ? 2 : batch.priority === 'high' ? 3 : 4,
+        call_settings: batch.call_settings,
+        allow_duplicates: false,
+      });
+      
+      alert(`✅ Campaña duplicada exitosamente!\n\nNombre: ${batch.name} (Copia)\n\nAhora puedes agregar nuevos contactos a esta campaña.`);
+      onClose(); // Cerrar modal actual
+    } catch (error) {
+      console.error('Error al duplicar campaña:', error);
+      alert('❌ Error al duplicar la campaña. Por favor intenta nuevamente.');
+    }
   };
 
   // Manejar selección de todos
@@ -286,8 +452,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: '📊' },
     { id: 'jobs', label: 'Llamadas', icon: '📞' },
-    { id: 'settings', label: 'Configuración', icon: '⚙️' },
-    { id: 'logs', label: 'Logs', icon: '📋' }
+    { id: 'settings', label: 'Configuración', icon: '⚙️' }
   ];
 
   return (
@@ -418,20 +583,22 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Llamadas Pendientes</dt>
                       <dd className="text-sm text-gray-900">
-                        {(batch.stats?.total_contacts || 0) - (batch.stats?.calls_completed || 0) - (batch.stats?.calls_failed || 0)}
+                        {realStats.pending}
                       </dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Duración Promedio</dt>
-                      <dd className="text-sm text-gray-900">{batch.stats?.avg_call_duration || 0}s</dd>
+                      <dd className="text-sm text-gray-900">
+                        {realStats.avgDuration}s
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Costo Total Estimado</dt>
-                      <dd className="text-sm text-gray-900">${batch.stats?.total_cost || 0}</dd>
+                      <dd className="text-sm text-gray-900">${(batch.total_cost || batch.estimated_cost || 0).toFixed(2)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Tiempo Total</dt>
-                      <dd className="text-sm text-gray-900">{batch.stats?.total_duration || 0} min</dd>
+                      <dd className="text-sm text-gray-900">{realStats.totalDuration.toFixed(1)} min</dd>
                     </div>
                   </dl>
                 </div>
@@ -441,38 +608,131 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
               <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-3">Script de la Llamada</h4>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                    {batch.script_content}
-                  </pre>
+                  {batch.script_content ? (
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                      {batch.script_content}
+                    </pre>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">
+                      No hay script disponible para esta campaña
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Recent Activity */}
+              {/* Logs de Ejecución */}
               <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-3">Actividad Reciente</h4>
+                <h4 className="text-lg font-medium text-gray-900 mb-3">Logs de Ejecución</h4>
                 <div className="space-y-3">
-                  <div className="flex items-center p-3 bg-blue-50 rounded-lg">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full mr-3"></div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Campaña iniciada</p>
-                      <p className="text-xs text-gray-500">{new Date(batch.created_at).toLocaleString()}</p>
+                  {/* Log: Campaña iniciada */}
+                  <div className="flex items-start p-3 bg-blue-50 rounded-lg">
+                    <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2 mr-3"></div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900">Campaña iniciada</p>
+                        <span className="text-xs text-gray-500">
+                          {new Date(batch.created_at).toLocaleString('es-CL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Se han cargado {batch.total_jobs || 0} contactos para procesar
+                      </p>
                     </div>
                   </div>
-                  {batch.status === 'PAUSED' && (
-                    <div className="flex items-center p-3 bg-yellow-50 rounded-lg">
-                      <div className="w-2 h-2 bg-yellow-600 rounded-full mr-3"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Campaña pausada</p>
-                        <p className="text-xs text-gray-500">{new Date(batch.updated_at).toLocaleString()}</p>
+
+                  {/* Log: Llamadas completadas */}
+                  {realStats.completed > 0 && (
+                    <div className="flex items-start p-3 bg-green-50 rounded-lg">
+                      <div className="flex-shrink-0 w-2 h-2 bg-green-600 rounded-full mt-2 mr-3"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-900">Llamadas completadas</p>
+                          <span className="text-xs text-gray-500">
+                            {new Date(batch.updated_at).toLocaleString('es-CL', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {realStats.completed} llamadas completadas exitosamente
+                        </p>
                       </div>
                     </div>
                   )}
+
+                  {/* Log: Llamadas fallidas */}
+                  {realStats.failed > 0 && (
+                    <div className="flex items-start p-3 bg-red-50 rounded-lg">
+                      <div className="flex-shrink-0 w-2 h-2 bg-red-600 rounded-full mt-2 mr-3"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-900">Llamadas fallidas</p>
+                          <span className="text-xs text-gray-500">
+                            {new Date(batch.updated_at).toLocaleString('es-CL', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {realStats.failed} llamadas fallaron por diversos motivos
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Log: Estado actual */}
+                  {batch.status === 'PAUSED' && (
+                    <div className="flex items-start p-3 bg-yellow-50 rounded-lg">
+                      <div className="flex-shrink-0 w-2 h-2 bg-yellow-600 rounded-full mt-2 mr-3"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-900">Campaña pausada</p>
+                          <span className="text-xs text-gray-500">
+                            {new Date(batch.updated_at).toLocaleString('es-CL', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          La campaña fue pausada. {realStats.pending} llamadas pendientes.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {batch.status === 'COMPLETED' && (
-                    <div className="flex items-center p-3 bg-green-50 rounded-lg">
-                      <div className="w-2 h-2 bg-green-600 rounded-full mr-3"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Campaña completada</p>
-                        <p className="text-xs text-gray-500">{new Date(batch.updated_at).toLocaleString()}</p>
+                    <div className="flex items-start p-3 bg-green-50 rounded-lg">
+                      <div className="flex-shrink-0 w-2 h-2 bg-green-600 rounded-full mt-2 mr-3"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-900">Campaña completada</p>
+                          <span className="text-xs text-gray-500">
+                            {new Date(batch.updated_at).toLocaleString('es-CL', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Todas las llamadas han sido procesadas
+                        </p>
                       </div>
                     </div>
                   )}
@@ -506,16 +766,27 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                     onClick={() => setShowFilters(!showFilters)}
                   >
                     <Filter className="w-4 h-4 mr-1" />
-                    Filtrar
+                    Filtros
                   </Button>
                 </div>
+              </div>
+
+              {/* Buscador siempre visible */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="🔍 Buscar por nombre, RUT o teléfono..."
+                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
 
               {/* Panel de Filtros */}
               {showFilters && (
                 <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h5 className="font-medium text-gray-900">Filtros</h5>
+                    <h5 className="font-medium text-gray-900">Filtros Avanzados</h5>
                     <button
                       onClick={handleClearFilters}
                       className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
@@ -544,23 +815,10 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                         <option value="cancelled">Cancelado</option>
                       </select>
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Buscar
-                      </label>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Nombre o teléfono..."
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
                   </div>
                   
                   <div className="text-sm text-gray-600">
-                    Mostrando {filteredJobs.length} de {Array.isArray(jobs) ? jobs.length : 0} llamadas
+                    Mostrando {paginatedJobs.length} de {filteredJobs.length} llamadas {filteredJobs.length !== (Array.isArray(jobs) ? jobs.length : 0) && `(${Array.isArray(jobs) ? jobs.length : 0} total)`}
                   </div>
                 </div>
               )}
@@ -582,7 +840,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left">
+                        <th className="px-2 py-2 text-left">
                           <input
                             type="checkbox"
                             checked={selectAll}
@@ -590,19 +848,33 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Intentos</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duración</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Intentos</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Duración</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Compromiso</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredJobs.map((job: any) => (
+                      {paginatedJobs.map((job: any) => {
+                        // Extraer compromiso de pago para cada job
+                        const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
+                        const fechaPago = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente;
+                        const montoPago = job.monto_pago_cliente || 
+                          (typeof dynamicVars?.monto_pago_cliente === 'string' 
+                            ? parseFloat(dynamicVars.monto_pago_cliente) 
+                            : dynamicVars?.monto_pago_cliente);
+                        
+                        // Calcular duración correctamente
+                        const duracionSegundos = job.call_duration_seconds || 
+                          (job.call_result?.summary?.duration_ms ? Math.round(job.call_result.summary.duration_ms / 1000) : 0);
+                        
+                        return (
                         <tr key={job._id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="checkbox"
                               checked={selectedJobIds.has(job._id)}
@@ -610,14 +882,14 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.contact?.name || job.contact_info?.nombre || 'N/A'}
+                          <td className="px-2 py-2 text-xs text-gray-900">
+                            {job.nombre || job.contact?.name || 'N/A'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.contact?.phones?.[0] || job.contact_info?.telefono || 'N/A'}
+                          <td className="px-2 py-2 text-xs text-gray-900">
+                            {job.to_number || job.contact?.phones?.[0] || 'N/A'}
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          <td className="px-2 py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               job.status === 'completed' || job.status === 'done' ? 'bg-green-100 text-green-800' :
                               job.status === 'failed' ? 'bg-red-100 text-red-800' :
                               job.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
@@ -627,33 +899,119 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                               {job.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.attempts || job.attempts_made || 0} / {job.max_attempts || 3}
+                          <td className="px-2 py-2 text-xs text-gray-900 text-center">
+                            {job.attempts || 0}/{job.max_attempts || 3}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {job.call_duration_seconds || job.call_result?.duration || 0}s
+                          <td className="px-2 py-2 text-xs text-gray-900 text-center">
+                            {duracionSegundos}s
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
-                            {new Date(job.created_at).toLocaleDateString()}
+                          <td className="px-2 py-2 text-xs">
+                            {fechaPago && montoPago ? (
+                              <div className="text-center">
+                                <div className="text-gray-900 font-medium whitespace-nowrap">
+                                  💰 ${(montoPago / 1000).toFixed(0)}k
+                                </div>
+                                <div className="text-gray-500">
+                                  {new Date(fechaPago).toLocaleDateString('es-CL', { day: 'numeric', month: 'numeric' })}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium">
+                          <td className="px-2 py-2 text-xs text-gray-500 text-center">
+                            {new Date(job.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })}
+                          </td>
+                          <td className="px-2 py-2">
                             <Button 
                               size="sm" 
                               variant="secondary"
                               onClick={() => handleViewJobDetail(job)}
                             >
-                              Ver Detalle
+                              Ver
                             </Button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
-                  {filteredJobs.length > 10 && (
-                    <div className="bg-gray-50 px-4 py-3 text-center">
-                      <p className="text-sm text-gray-500">
-                        Mostrando primeros 10 de {filteredJobs.length} llamadas filtradas
-                      </p>
+                  
+                  {/* Controles de paginación */}
+                  {totalPages > 1 && (
+                    <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200">
+                      <div className="flex-1 flex justify-between sm:hidden">
+                        <Button
+                          variant="secondary"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          size="sm"
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          size="sm"
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm text-gray-700">
+                            Mostrando <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> a{' '}
+                            <span className="font-medium">
+                              {Math.min(currentPage * itemsPerPage, filteredJobs.length)}
+                            </span>{' '}
+                            de <span className="font-medium">{filteredJobs.length}</span> resultados
+                          </p>
+                        </div>
+                        <div>
+                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentPage === 1}
+                              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              ←
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                              // Mostrar solo algunas páginas alrededor de la actual
+                              if (
+                                page === 1 ||
+                                page === totalPages ||
+                                (page >= currentPage - 1 && page <= currentPage + 1)
+                              ) {
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                      currentPage === page
+                                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                );
+                              } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                return <span key={page} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>;
+                              }
+                              return null;
+                            })}
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                              disabled={currentPage === totalPages}
+                              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              →
+                            </button>
+                          </nav>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -707,32 +1065,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-3">Configuración de Voz</h4>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Velocidad</label>
-                      <div className="text-sm text-gray-900">{batch.voice_settings?.speed}x</div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Idioma</label>
-                      <div className="text-sm text-gray-900">{batch.voice_settings?.language}</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Tono</label>
-                      <div className="text-sm text-gray-900">{batch.voice_settings?.pitch}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Volumen</label>
-                      <div className="text-sm text-gray-900">{batch.voice_settings?.volume}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex justify-end space-x-3">
                 <Button variant="secondary" onClick={handleEditConfig}>
                   Editar Configuración
@@ -744,60 +1076,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'logs' && (
-            <div>
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Logs de Ejecución</h4>
-              
-              <div className="space-y-3">
-                <div className="flex items-start p-3 bg-blue-50 rounded-lg">
-                  <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2 mr-3"></div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900">Campaña iniciada</p>
-                      <span className="text-xs text-gray-500">{new Date(batch.created_at).toLocaleString()}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Se han cargado {batch.stats?.total_contacts || 0} contactos para procesar
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start p-3 bg-green-50 rounded-lg">
-                  <div className="flex-shrink-0 w-2 h-2 bg-green-600 rounded-full mt-2 mr-3"></div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900">Llamadas completadas</p>
-                      <span className="text-xs text-gray-500">Hace 2 horas</span>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {batch.stats?.calls_completed || 0} llamadas completadas exitosamente
-                    </p>
-                  </div>
-                </div>
-
-                {batch.stats?.calls_failed && batch.stats.calls_failed > 0 && (
-                  <div className="flex items-start p-3 bg-red-50 rounded-lg">
-                    <div className="flex-shrink-0 w-2 h-2 bg-red-600 rounded-full mt-2 mr-3"></div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900">Llamadas fallidas</p>
-                        <span className="text-xs text-gray-500">Hace 1 hora</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {batch.stats.calls_failed} llamadas fallaron por diversos motivos
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-center py-4">
-                  <Button size="sm" variant="secondary">
-                    Ver Logs Completos
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -817,6 +1095,98 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
           setSelectedJob(null);
         }}
       />
+
+      {/* Edit Config Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Editar Configuración de Llamadas"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-yellow-800">
+              ⚠️ <strong>Nota:</strong> Actualmente la API solo permite editar el nombre, descripción y prioridad de la campaña.
+              <br />
+              Para cambiar las configuraciones de llamada, te recomendamos duplicar la campaña.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Duración Máxima (segundos)
+              </label>
+              <Input
+                type="number"
+                value={editedCallSettings.max_call_duration}
+                onChange={(e) => setEditedCallSettings({
+                  ...editedCallSettings,
+                  max_call_duration: parseInt(e.target.value) || 0
+                })}
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tiempo de Timbrado (segundos)
+              </label>
+              <Input
+                type="number"
+                value={editedCallSettings.ring_timeout}
+                onChange={(e) => setEditedCallSettings({
+                  ...editedCallSettings,
+                  ring_timeout: parseInt(e.target.value) || 0
+                })}
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Intentos Máximos
+              </label>
+              <Input
+                type="number"
+                value={editedCallSettings.max_attempts}
+                onChange={(e) => setEditedCallSettings({
+                  ...editedCallSettings,
+                  max_attempts: parseInt(e.target.value) || 0
+                })}
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Horas entre Intentos
+              </label>
+              <Input
+                type="number"
+                value={editedCallSettings.retry_delay_hours}
+                onChange={(e) => setEditedCallSettings({
+                  ...editedCallSettings,
+                  retry_delay_hours: parseInt(e.target.value) || 0
+                })}
+                disabled
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={() => {
+              alert('La edición de configuración de llamadas no está disponible en la API actual.\n\nPor favor, duplica la campaña para crear una nueva con configuración diferente.');
+              setIsEditModalOpen(false);
+            }}>
+              Guardar Cambios
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Modal>
   );
 };

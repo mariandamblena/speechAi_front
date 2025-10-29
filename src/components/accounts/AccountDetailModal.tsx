@@ -3,6 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { AccountModel } from '@/types';
 import { useAccountBatches, useAccountTransactions } from '@/services/queries';
+import { useNavigate } from 'react-router-dom';
 
 interface AccountDetailModalProps {
   account: AccountModel | null;
@@ -16,6 +17,7 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'batches' | 'transactions' | 'settings'>('info');
+  const navigate = useNavigate();
 
   const { data: batches, isLoading: batchesLoading } = useAccountBatches(
     account?.account_id || '', 
@@ -77,7 +79,10 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
           <div className="grid grid-cols-3 gap-4 mt-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {account.plan_type === 'credit_based' ? account.balance?.credits || 0 : account.balance?.minutes || 0}
+                {(account.plan_type === 'credit_based' 
+                  ? (account.balance?.credits || 0) 
+                  : (account.balance?.minutes || 0)
+                ).toFixed(2)}
               </div>
               <div className="text-sm text-gray-500">
                 {account.plan_type === 'credit_based' ? 'Créditos' : 'Minutos'}
@@ -91,7 +96,7 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {account.balance?.total_spent || 0}
+                ${(account.balance?.total_spent || 0).toFixed(2)}
               </div>
               <div className="text-sm text-gray-500">Gastado Total</div>
             </div>
@@ -158,68 +163,16 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
                       <dt className="text-sm font-medium text-gray-500">Saldo Actual</dt>
                       <dd className="text-sm text-gray-900">
                         {account.plan_type === 'credit_based' 
-                          ? `${account.balance?.credits || 0} créditos`
-                          : `${account.balance?.minutes || 0} minutos`
+                          ? `${(account.balance?.credits || 0).toFixed(2)} créditos`
+                          : `${(account.balance?.minutes || 0).toFixed(2)} minutos`
                         }
                       </dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Total Gastado</dt>
-                      <dd className="text-sm text-gray-900">{formatCurrency(account.balance?.total_spent || 0)}</dd>
+                      <dd className="text-sm text-gray-900">${(account.balance?.total_spent || 0).toFixed(2)}</dd>
                     </div>
                   </dl>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-3">Características Incluidas</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className={`p-3 rounded-lg ${account.features.voice_cloning ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">{account.features.voice_cloning ? '✅' : '❌'}</div>
-                      <div className="text-xs font-medium">Clonación de Voz</div>
-                    </div>
-                  </div>
-                  <div className={`p-3 rounded-lg ${account.features.advanced_analytics ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">{account.features.advanced_analytics ? '✅' : '❌'}</div>
-                      <div className="text-xs font-medium">Analytics Avanzados</div>
-                    </div>
-                  </div>
-                  <div className={`p-3 rounded-lg ${account.features.custom_integration ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">{account.features.custom_integration ? '✅' : '❌'}</div>
-                      <div className="text-xs font-medium">Integración Custom</div>
-                    </div>
-                  </div>
-                  <div className={`p-3 rounded-lg ${account.features.priority_support ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">{account.features.priority_support ? '✅' : '❌'}</div>
-                      <div className="text-xs font-medium">Soporte Prioritario</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-3">API Access</h4>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">API Token</label>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <code className="bg-white px-3 py-2 rounded border text-sm font-mono">
-                          {account.api_token}
-                        </code>
-                        <Button size="sm" variant="secondary">
-                          Copiar
-                        </Button>
-                        <Button size="sm" variant="danger">
-                          Regenerar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -238,31 +191,38 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : !batches || batches.length === 0 ? (
+              ) : !batches || (Array.isArray(batches) && batches.length === 0) ? (
                 <div className="text-center py-8 text-gray-500">
                   No hay batches creados para esta cuenta
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {batches.map((batch: any) => (
-                    <div key={batch._id} className="border border-gray-200 rounded-lg p-4">
+                  {Array.isArray(batches) && batches.map((batch: any) => (
+                    <button
+                      key={batch._id}
+                      onClick={() => {
+                        onClose();
+                        navigate('/batches', { state: { selectedBatchId: batch.batch_id } });
+                      }}
+                      className="w-full border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors text-left"
+                    >
                       <div className="flex items-center justify-between">
                         <div>
                           <h5 className="font-medium text-gray-900">{batch.name}</h5>
                           <p className="text-sm text-gray-500">
-                            {batch.total_contacts} contactos • Creado {new Date(batch.created_at).toLocaleDateString()}
+                            {batch.total_jobs || 0} llamadas • Creado {new Date(batch.created_at).toLocaleDateString()}
                           </p>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          batch.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          batch.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                          batch.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {batch.status}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            batch.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {batch.is_active ? 'Activa' : 'Pausada'}
+                          </span>
+                          <span className="text-blue-600">→</span>
+                        </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -277,13 +237,13 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : !transactions || transactions.length === 0 ? (
+              ) : !transactions || (Array.isArray(transactions) && transactions.length === 0) ? (
                 <div className="text-center py-8 text-gray-500">
                   No hay transacciones registradas
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {transactions.map((transaction: any) => (
+                  {Array.isArray(transactions) && transactions.map((transaction: any) => (
                     <div key={transaction._id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -312,28 +272,16 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
           {activeTab === 'settings' && (
             <div className="space-y-6">
               <div>
-                <h4 className="text-lg font-medium text-gray-900 mb-3">Configuraciones de Llamadas</h4>
+                <h4 className="text-lg font-medium text-gray-900 mb-3">Configuraciones Generales</h4>
                 <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Horario Permitido</label>
-                      <div className="text-sm text-gray-900">
-                        {account.settings.allowed_call_hours.start} - {account.settings.allowed_call_hours.end}
-                      </div>
-                    </div>
-                    <div>
                       <label className="text-sm font-medium text-gray-500">Zona Horaria</label>
-                      <div className="text-sm text-gray-900">{account.settings.timezone}</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Intentos Máximos</label>
-                      <div className="text-sm text-gray-900">{account.settings.retry_settings.max_attempts}</div>
+                      <div className="text-sm text-gray-900">{account.settings?.timezone || 'America/Santiago'}</div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Horas entre Intentos</label>
-                      <div className="text-sm text-gray-900">{account.settings.retry_settings.retry_delay_hours}h</div>
+                      <label className="text-sm font-medium text-gray-500">País</label>
+                      <div className="text-sm text-gray-900">{account.country || 'Chile'}</div>
                     </div>
                   </div>
                 </div>
@@ -344,26 +292,36 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{account.features.max_concurrent_calls}</div>
-                      <div className="text-sm text-gray-500">Concurrentes</div>
+                      <div className="text-2xl font-bold text-blue-600">{account.features?.max_concurrent_calls || 5}</div>
+                      <div className="text-sm text-gray-500">Llamadas Concurrentes</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">50</div>
-                      <div className="text-sm text-gray-500">Por Hora</div>
+                      <div className="text-2xl font-bold text-purple-600">—</div>
+                      <div className="text-sm text-gray-500">Sin límite por hora</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">500</div>
-                      <div className="text-sm text-gray-500">Por Día</div>
+                      <div className="text-2xl font-bold text-green-600">—</div>
+                      <div className="text-sm text-gray-500">Sin límite por día</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex justify-end space-x-3">
-                <Button variant="secondary">
+                <Button 
+                  variant="secondary"
+                  onClick={() => alert('Funcionalidad en desarrollo')}
+                >
                   Editar Configuración
                 </Button>
-                <Button variant="primary">
+                <Button 
+                  variant="primary"
+                  onClick={() => {
+                    if (confirm('¿Estás seguro de regenerar el token? El token actual dejará de funcionar.')) {
+                      alert('Funcionalidad en desarrollo');
+                    }
+                  }}
+                >
                   Regenerar Token API
                 </Button>
               </div>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useBatches, useCreateBatch, useCreateBatchFromExcel, useAccounts, useDeleteBatch, useToggleBatchStatus } from '@/services/queries';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useBatches, useCreateBatch, useCreateBatchFromExcel, useAccounts, useDeleteBatch, useToggleBatchStatus, useJobs } from '@/services/queries';
 import { BatchModel, CreateBatchRequest } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CreateBatchModal } from '@/components/batches/CreateBatchModal';
@@ -7,6 +8,7 @@ import { BatchDetailModal } from '@/components/batches/BatchDetailModal';
 import { Plus, Search, Filter, Megaphone, CheckCircle2, XCircle, Clock, Pause, Trash2, Play } from 'lucide-react';
 
 export const BatchesPage: React.FC = () => {
+  const location = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchModel | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -16,10 +18,77 @@ export const BatchesPage: React.FC = () => {
     statusFilter === 'all' ? {} : { status: statusFilter }
   );
   const { data: accounts } = useAccounts();
+  const { data: jobs } = useJobs({}); // Obtener todos los jobs para calcular totales financieros
   const createBatchMutation = useCreateBatch();
   const createBatchFromExcelMutation = useCreateBatchFromExcel();
   const deleteBatchMutation = useDeleteBatch();
   const toggleBatchStatusMutation = useToggleBatchStatus();
+
+  // Calcular totales financieros por batch
+  const batchFinancials = useMemo(() => {
+    if (!jobs || !batches) return {};
+
+    const financials: { [batchId: string]: { 
+      totalDeuda: number;
+      totalAcordado: number;
+      totalFaltante: number;
+    } } = {};
+
+    jobs.forEach((job: any) => {
+      const batchId = job.batch_id;
+      if (!batchId) return;
+
+      if (!financials[batchId]) {
+        financials[batchId] = {
+          totalDeuda: 0,
+          totalAcordado: 0,
+          totalFaltante: 0
+        };
+      }
+
+      // Buscar deuda en diferentes lugares
+      const deuda = job.deuda 
+        || job.monto_total 
+        || job.payload?.debt_amount 
+        || job.payload?.deuda
+        || job.payload?.monto_total
+        || 0;
+      
+      // Buscar monto acordado en diferentes lugares
+      const acordado = job.monto_pago_cliente 
+        || job.fecha_pago_cliente // A veces el monto viene como string en fecha_pago
+        || job.call_result?.summary?.collected_dynamic_variables?.monto_pago_cliente
+        || 0;
+      
+      // Convertir a número si es string
+      const deudaNum = typeof deuda === 'string' ? parseFloat(deuda) || 0 : deuda;
+      const acordadoNum = typeof acordado === 'string' ? parseFloat(acordado) || 0 : acordado;
+      
+      financials[batchId].totalDeuda += deudaNum;
+      financials[batchId].totalAcordado += acordadoNum;
+      financials[batchId].totalFaltante += (deudaNum - acordadoNum);
+    });
+
+    // Log para debugging
+    console.log('📊 Financials calculados:', financials);
+    if (jobs.length > 0) {
+      console.log('📋 Ejemplo de job:', jobs[0]);
+    }
+
+    return financials;
+  }, [jobs, batches]);
+
+  // Abrir modal si viene desde otra página con selectedBatchId
+  useEffect(() => {
+    if (location.state?.selectedBatchId && batches) {
+      const batch = batches.find((b: BatchModel) => b.batch_id === location.state.selectedBatchId);
+      if (batch) {
+        setSelectedBatch(batch);
+        // Limpiar el estado de navegación
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, batches]);
 
   const handleCreateBatch = async (batchData: CreateBatchRequest) => {
     setIsCreating(true);
@@ -348,6 +417,15 @@ export const BatchesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Contactos
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Deuda Total
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acordado
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Faltante
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Progreso
                   </th>
@@ -366,6 +444,10 @@ export const BatchesPage: React.FC = () => {
                 {batches.map((batch) => {
                   const progress = calculateProgress(batch);
                   const account = accounts?.find(acc => acc.account_id === batch.account_id);
+                  const financials = batchFinancials[batch.batch_id] || { totalDeuda: 0, totalAcordado: 0, totalFaltante: 0 };
+                  const porcentajeRecuperado = financials.totalDeuda > 0 
+                    ? ((financials.totalAcordado / financials.totalDeuda) * 100).toFixed(1)
+                    : '0.0';
                   
                   return (
                     <tr key={batch._id} className="hover:bg-gray-50">
@@ -390,6 +472,24 @@ export const BatchesPage: React.FC = () => {
                         </div>
                         <div className="text-xs text-gray-500">
                           {batch.stats?.calls_completed || 0} completadas
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-medium text-gray-900">
+                          ${financials.totalDeuda.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-medium text-green-600">
+                          ${financials.totalAcordado.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {porcentajeRecuperado}% recup.
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-medium text-red-600">
+                          ${financials.totalFaltante.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
