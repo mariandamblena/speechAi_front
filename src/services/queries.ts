@@ -50,13 +50,23 @@ const mapBackendBatchToFrontend = (backendBatch: any): BatchModel => {
     schedule_type: 'immediate',
     created_at: backendBatch.created_at,
     updated_at: backendBatch.created_at,
+    // 🆕 Campos directos del backend
+    is_active: backendBatch.is_active,
+    total_jobs: backendBatch.total_jobs || 0,
+    pending_jobs: backendBatch.pending_jobs || 0,
+    completed_jobs: backendBatch.completed_jobs || 0,
+    failed_jobs: backendBatch.failed_jobs || 0,
+    suspended_jobs: backendBatch.suspended_jobs || 0,
+    total_cost: backendBatch.total_cost || 0,
+    total_minutes: backendBatch.total_minutes || 0,
+    estimated_cost: backendBatch.estimated_cost || 0,
     stats: {
-      total_contacts: backendBatch.total_jobs,
-      calls_completed: backendBatch.completed_jobs,
-      calls_failed: backendBatch.failed_jobs,
-      calls_pending: backendBatch.pending_jobs,
-      total_cost: backendBatch.total_cost,
-      total_duration: backendBatch.total_minutes
+      total_contacts: backendBatch.total_jobs || 0,
+      calls_completed: backendBatch.completed_jobs || 0,
+      calls_failed: backendBatch.failed_jobs || 0,
+      calls_pending: backendBatch.pending_jobs || 0,
+      total_cost: backendBatch.total_cost || 0,
+      total_duration: backendBatch.total_minutes || 0
     }
   };
 };
@@ -180,30 +190,43 @@ export const useTopupAccount = () => {
   });
 };
 
+// ⚠️ DEPRECATED: Use useUpdateAccount with status field instead
+// Kept for backward compatibility but will be removed in v2.0.0
 export const useSuspendAccount = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async ({ accountId, reason }: { accountId: string; reason: string }) => {
-      const response = await api.put(`/accounts/${accountId}/suspend`, { reason });
+      // Using PATCH instead of deprecated PUT /suspend
+      const response = await api.patch(`/accounts/${accountId}`, { 
+        status: 'suspended',
+        suspension_reason: reason 
+      });
       return response.data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['accounts', variables.accountId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
   });
 };
 
+// ⚠️ DEPRECATED: Use useUpdateAccount with status field instead
+// Kept for backward compatibility but will be removed in v2.0.0
 export const useActivateAccount = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (accountId: string) => {
-      const response = await api.put(`/accounts/${accountId}/activate`);
+      // Using PATCH instead of deprecated PUT /activate
+      const response = await api.patch(`/accounts/${accountId}`, { 
+        status: 'active' 
+      });
       return response.data;
     },
     onSuccess: (_, accountId) => {
       queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
   });
 };
@@ -220,16 +243,34 @@ export const useAccounts = () => {
   });
 };
 
-// Update account
+// ✅ RECOMMENDED: Use this for all account updates
+// Supports updating multiple fields at once with PATCH
 export const useUpdateAccount = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ accountId, data }: { accountId: string; data: Partial<AccountModel> }) => {
-      const response = await api.put(`/accounts/${accountId}`, data);
+    mutationFn: async ({ 
+      accountId, 
+      updates 
+    }: { 
+      accountId: string; 
+      updates: {
+        status?: 'active' | 'suspended';
+        suspension_reason?: string;
+        account_name?: string;
+        contact_name?: string;
+        contact_email?: string;
+        contact_phone?: string;
+        plan_type?: string;
+        features?: Record<string, any>;
+        settings?: Record<string, any>;
+      }
+    }) => {
+      const response = await api.patch(`/accounts/${accountId}`, updates);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { accountId }) => {
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
   });
@@ -318,7 +359,7 @@ export const useBatch = (
     queryKey: ['batches', batchId],
     queryFn: async (): Promise<BatchModel> => {
       const response = await api.get(`/batches/${batchId}`);
-      return response.data;
+      return mapBackendBatchToFrontend(response.data);
     },
     enabled: options?.enabled !== undefined ? options.enabled : !!batchId,
   });
@@ -436,6 +477,18 @@ export const useUpdateBatch = () => {
         name?: string;
         description?: string;
         priority?: number;
+        call_settings?: {
+          max_call_duration?: number;
+          ring_timeout?: number;
+          max_attempts?: number;
+          retry_delay_hours?: number;
+          allowed_hours?: {
+            start: string;
+            end: string;
+          };
+          days_of_week?: number[];
+          timezone?: string;
+        };
       }
     }) => {
       const response = await api.patch(`/batches/${batchId}`, updates);
@@ -709,12 +762,15 @@ export const useRetryJob = () => {
   });
 };
 
+// ⚠️ DEPRECATED: DELETE is semantically incorrect for canceling
+// Use PUT /cancel instead (changes state, doesn't delete)
 export const useCancelJob = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (jobId: string) => {
-      const response = await api.delete(`/jobs/${jobId}`);
+      // Using PUT /cancel instead of DELETE (semantic correctness)
+      const response = await api.put(`/jobs/${jobId}/cancel`);
       return response.data;
     },
     onSuccess: () => {
@@ -729,19 +785,19 @@ export const useCancelJob = () => {
   });
 };
 
-// Bulk delete jobs
+// Bulk cancel jobs (not delete - jobs stay in DB with 'cancelled' status)
 export const useBulkDeleteJobs = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (jobIds: string[]) => {
-      // Delete jobs in parallel
-      const deletePromises = jobIds.map(jobId => 
-        api.delete(`/jobs/${jobId}`)
+      // Cancel jobs in parallel (using PUT /cancel instead of DELETE)
+      const cancelPromises = jobIds.map(jobId => 
+        api.put(`/jobs/${jobId}/cancel`)
       );
-      const responses = await Promise.allSettled(deletePromises);
+      const responses = await Promise.allSettled(cancelPromises);
       
-      // Count successful and failed deletions
+      // Count successful and failed cancellations
       const successful = responses.filter(r => r.status === 'fulfilled').length;
       const failed = responses.filter(r => r.status === 'rejected').length;
       

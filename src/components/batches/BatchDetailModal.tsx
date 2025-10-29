@@ -30,6 +30,12 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     ring_timeout: 0,
     max_attempts: 0,
     retry_delay_hours: 0,
+    allowed_hours: {
+      start: '09:00',
+      end: '20:00'
+    },
+    days_of_week: [1, 2, 3, 4, 5] as number[],
+    timezone: 'America/Santiago'
   });
   
   // Filtros
@@ -333,14 +339,17 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   };
 
   const handleEditConfig = () => {
-    if (!batch) return;
+    if (!batch || !batch.call_settings) return;
     
-    // Inicializar formulario con valores actuales
+    // Inicializar formulario con valores actuales del batch
     setEditedCallSettings({
-      max_call_duration: batch.call_settings?.max_call_duration || 0,
-      ring_timeout: batch.call_settings?.ring_timeout || 0,
-      max_attempts: batch.call_settings?.max_attempts || 0,
-      retry_delay_hours: batch.call_settings?.retry_delay_hours || 0,
+      max_call_duration: batch.call_settings.max_call_duration || 300,
+      ring_timeout: batch.call_settings.ring_timeout || 30,
+      max_attempts: batch.call_settings.max_attempts || 3,
+      retry_delay_hours: batch.call_settings.retry_delay_hours || 24,
+      allowed_hours: batch.call_settings.allowed_hours || { start: '09:00', end: '20:00' },
+      days_of_week: batch.call_settings.days_of_week || [1, 2, 3, 4, 5],
+      timezone: batch.call_settings.timezone || 'America/Santiago'
     });
     
     setIsEditModalOpen(true);
@@ -353,19 +362,15 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       await updateBatchMutation.mutateAsync({
         batchId: batch.batch_id,
         updates: {
-          // Aquí solo podemos actualizar campos permitidos por el backend
-          // Según useUpdateBatch, solo permite: is_active, name, description, priority
-          name: batch.name, // Mantener igual por ahora
-          description: batch.description,
-          priority: batch.priority === 'low' ? 1 : batch.priority === 'normal' ? 2 : batch.priority === 'high' ? 3 : 4,
+          call_settings: editedCallSettings
         }
       });
       
-      alert('⚠️ Nota: La API actual solo permite editar nombre, descripción y prioridad.\n\nPara cambiar configuraciones de llamada, debes duplicar la campaña y crear una nueva.');
       setIsEditModalOpen(false);
-    } catch (error) {
-      console.error('Error al actualizar configuración:', error);
-      alert('Error al guardar la configuración');
+      alert('✅ Configuración actualizada correctamente');
+    } catch (error: any) {
+      console.error('Error updating call_settings:', error);
+      alert(`❌ Error al actualizar: ${error.message || 'Error desconocido'}`);
     }
   };
 
@@ -1104,14 +1109,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
         size="md"
       >
         <div className="space-y-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-yellow-800">
-              ⚠️ <strong>Nota:</strong> Actualmente la API solo permite editar el nombre, descripción y prioridad de la campaña.
-              <br />
-              Para cambiar las configuraciones de llamada, te recomendamos duplicar la campaña.
-            </p>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1124,7 +1121,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   ...editedCallSettings,
                   max_call_duration: parseInt(e.target.value) || 0
                 })}
-                disabled
               />
             </div>
 
@@ -1139,7 +1135,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   ...editedCallSettings,
                   ring_timeout: parseInt(e.target.value) || 0
                 })}
-                disabled
               />
             </div>
 
@@ -1154,7 +1149,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   ...editedCallSettings,
                   max_attempts: parseInt(e.target.value) || 0
                 })}
-                disabled
               />
             </div>
 
@@ -1169,7 +1163,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   ...editedCallSettings,
                   retry_delay_hours: parseInt(e.target.value) || 0
                 })}
-                disabled
               />
             </div>
           </div>
@@ -1178,10 +1171,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
             <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={() => {
-              alert('La edición de configuración de llamadas no está disponible en la API actual.\n\nPor favor, duplica la campaña para crear una nueva con configuración diferente.');
-              setIsEditModalOpen(false);
-            }}>
+            <Button variant="primary" onClick={handleSaveConfig}>
               Guardar Cambios
             </Button>
           </div>

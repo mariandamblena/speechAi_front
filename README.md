@@ -1,32 +1,28 @@
 # SpeechAI Campaign Manager
 
-Frontend completo en React + Vite + TypeScript para gestionar campañas/lotes de llamadas automatizadas con IA.
+Frontend en React + Vite + TypeScript para gestionar campañas de llamadas automatizadas con IA de cobranza.
 
-## 🚀 Características
+## 🚀 Características Principales
 
-- **Wizard de creación**: Upload Excel → mapping columnas → validación → crear campaña
-- **Gestión de campañas**: Ver, pausar, reanudar, eliminar batches
-- **Monitoreo en tiempo real**: WebSocket/SSE para llamadas en progreso
-- **Gestión de contactos**: Importar, exportar, buscar, filtros
-- **Jobs y reintentos**: Ver transcripciones, análisis NLP, reintentar manualmente
-- **Reportes**: Generar y descargar Excel/JSON
-- **Panel admin**: Estado de workers, configuración
-- **Autenticación**: Login con JWT, roles (admin/operator)
+- **Dashboard en tiempo real**: Estadísticas del día, batches activos y resumen de llamadas
+- **Gestión de Campañas (Batches)**: Crear, pausar, reanudar y configurar lotes de llamadas
+- **Wizard de creación**: Upload Excel → mapeo de columnas → creación de campaña
+- **Gestión de Llamadas (Jobs)**: Monitoreo por batch con estados en tiempo real
+- **Vista detallada**: Transcripciones, compromisos de pago, análisis de llamadas
+- **Gestión de Cuentas**: Administración de clientes con balance y configuración
+- **Reportes**: Visualización de métricas y estadísticas de campañas
+- **Autenticación**: Login con JWT y control de acceso
 
 ## 🛠️ Stack Tecnológico
 
-- **React 18** + **Vite** + **TypeScript**
-- **React Router v6** para navegación
-- **TanStack Query** para server state management
-- **Axios** con interceptores para API calls
-- **React Hook Form + Yup** para formularios y validaciones
-- **Zustand** para estado local/UI
-- **react-dropzone** para uploads
-- **Recharts** para gráficos y estadísticas
-- **TanStack Table** para tablas virtualizadas
-- **MSW** para mocking de API durante desarrollo
-- **Jest + RTL** para testing
-- **Storybook** para componentes
+- **React 18.2.0** con **TypeScript 5**
+- **Vite** para desarrollo rápido con HMR
+- **React Router v6** para navegación SPA
+- **TanStack Query (React Query)** para manejo de estado del servidor
+- **Axios** para peticiones HTTP con interceptores
+- **Tailwind CSS** para estilos
+- **Lucide React** para iconos
+- **date-fns** para manejo de fechas
 
 ## 🏃‍♂️ Inicio Rápido
 
@@ -41,37 +37,27 @@ npm >= 8
 
 ```bash
 # Clonar el proyecto
-git clone <repo-url>
-cd speechai-frontend
+git clone https://github.com/mariandamblena/speechAi_front.git
+cd speechAi_front
 
 # Instalar dependencias
 npm install
 
 # Configurar variables de entorno
 cp .env.example .env
+# Editar .env con tu configuración
 
-# Iniciar desarrollo con HMR
+# Iniciar desarrollo
 npm run dev
 ```
 
 ### Scripts Disponibles
 
 ```bash
-# Desarrollo
 npm run dev          # Servidor de desarrollo (puerto 3000)
 npm run build        # Build para producción
-npm run preview      # Preview del build
-
-# Testing
-npm test             # Ejecutar tests
-npm run test:watch   # Tests en modo watch
-
-# Calidad de código
-npm run lint         # ESLint
-npm run lint:fix     # ESLint con auto-fix
-
-# Documentación
-npm run storybook    # Storybook (puerto 6006)
+npm run preview      # Preview del build de producción
+npm run lint         # Verificar código con ESLint
 ```
 
 ## 🔧 Configuración
@@ -80,273 +66,232 @@ npm run storybook    # Storybook (puerto 6006)
 
 ```bash
 # .env
-VITE_API_BASE=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
-VITE_CALL_POLLING_INTERVAL=5000
-VITE_MAX_FILE_SIZE_MB=10
+VITE_API_BASE_URL=http://localhost:8000
 ```
-
-### Configuración de MSW (Mock Service Worker)
-
-El proyecto incluye mocks completos para desarrollo:
-
-- `/api/auth/*` - Autenticación
-- `/api/upload/excel` - Upload de archivos
-- `/api/batches/*` - Gestión de campañas
-- `/api/jobs/*` - Gestión de llamadas
-- `/api/reports/*` - Reportes
-- `/api/workers/*` - Panel admin
-
-Los mocks se activan automáticamente en desarrollo. Para usar API real, modifica `src/mocks/browser.ts`.
 
 ## 📁 Estructura del Proyecto
 
 ```
 src/
-├── assets/          # Imágenes, iconos
-├── components/      # Componentes reutilizables
-│   ├── ui/         # Componentes básicos (Button, Input, Modal)
-│   ├── wizard/     # FileUploader, ColumnMapper
-│   ├── tables/     # Tablas especializadas
-│   └── charts/     # Componentes de gráficos
-├── pages/          # Páginas/rutas principales
-│   ├── Auth/       # Login
-│   ├── Dashboard/  # Dashboard principal
-│   ├── Batches/    # Gestión de campañas
-│   ├── Jobs/       # Monitoreo de llamadas
-│   ├── Reports/    # Reportes
-│   ├── Workers/    # Panel admin
-│   └── Settings/   # Configuración
-├── hooks/          # Custom hooks
-│   ├── useAuth.tsx
-│   ├── useWebSocket.ts
-│   └── useUploader.ts
-├── services/       # API y servicios
-│   ├── api.ts      # Axios instance + interceptores
-│   ├── queries.ts  # React Query hooks
-│   └── ws.ts       # WebSocket manager
-├── mocks/          # MSW handlers
-├── store/          # Zustand stores
-├── types/          # TypeScript types
-├── utils/          # Utilidades
-├── App.tsx
-└── main.tsx
+├── components/         # Componentes reutilizables
+│   ├── ui/            # Componentes básicos (Button, Input, Modal)
+│   ├── layout/        # Layout principal con navegación
+│   ├── auth/          # Componentes de autenticación
+│   ├── accounts/      # Componentes de gestión de cuentas
+│   ├── batches/       # Componentes de gestión de lotes
+│   ├── jobs/          # Componentes de gestión de llamadas
+│   └── wizard/        # Wizard de creación de campañas
+├── pages/             # Páginas principales
+│   ├── Auth/          # Página de login
+│   ├── Dashboard/     # Dashboard con estadísticas
+│   ├── Accounts/      # Gestión de cuentas
+│   ├── Batches/       # Listado y detalle de campañas
+│   ├── Jobs/          # Listado de llamadas agrupadas
+│   ├── Reports/       # Reportes y métricas
+│   └── Test/          # Página de prueba de API
+├── hooks/             # Custom hooks
+│   ├── useAuth.tsx    # Hook de autenticación
+│   └── useWebSocket.ts # Hook de WebSocket
+├── routes/            # Configuración de rutas
+├── services/          # Servicios de API
+│   ├── api.ts         # Cliente Axios configurado
+│   └── queries.ts     # Hooks de React Query
+├── types/             # Tipos TypeScript
+│   └── index.ts       # Modelos de datos
+└── utils/             # Utilidades
 ```
 
-## 🧩 Componentes Principales
+## 🧩 Funcionalidades Detalladas
 
-### FileUploader
-```tsx
-<FileUploader
-  onUpload={(file) => console.log(file)}
-  accept={['.xlsx', '.csv']}
-  maxSize={10 * 1024 * 1024}
-  isLoading={uploading}
-/>
-```
+### Dashboard
+- Resumen del día con llamadas completadas, fallidas y en progreso
+- Tasa de éxito global
+- Batches activos y estadísticas
+- Listado de lotes recientes con estados
 
-### ColumnMapper
-```tsx
-<ColumnMapper
-  sampleRows={data.sampleRows}
-  detectedFormat="debt_collection"
-  onMappingChange={(mappings) => setMappings(mappings)}
-  onValidationChange={(errors) => setErrors(errors)}
-/>
-```
+### Gestión de Campañas (Batches)
+- Crear nuevos lotes desde archivo Excel
+- Ver detalles completos de cada lote
+- Estados: Activa / Pausada
+- Control de pause/resume
+- Configuración de llamadas (call_settings):
+  - Duración máxima de llamada
+  - Timeout de timbre
+  - Máximo de intentos
+  - Delay entre reintentos
+  - Horarios permitidos
+  - Días de la semana
+  - Zona horaria
 
-### BatchControls
-```tsx
-<BatchControls
-  batchId="batch-123"
-  currentState="active"
-  onPause={() => pauseBatch.mutate()}
-  onResume={() => resumeBatch.mutate()}
-/>
-```
+### Gestión de Llamadas (Jobs)
+- Listado agrupado por batch (colapsable)
+- Búsqueda por nombre, teléfono o ID de lote
+- Filtros por estado: Todas, Pendientes, En Progreso, Completadas, Fallidas
+- Vista de compromisos de pago con fecha y monto
+- Detalles completos de cada llamada:
+  - Transcripción
+  - Análisis de la llamada
+  - Grabación de audio
+  - Variables dinámicas capturadas
+  - Información de contacto
 
-## 🔌 Hooks Principales
+### Gestión de Cuentas
+- Listado de cuentas con balance y estado
+- Suspender/Activar cuentas
+- Ver detalles de consumo (minutos/créditos)
+- Información de contacto y plan
 
-### useAuth
+### Wizard de Creación
+1. **Upload de archivo**: Drag & drop de Excel con validación
+2. **Mapeo de columnas**: Asociar columnas a variables del sistema
+3. **Creación**: Configurar y crear el nuevo batch
+
+## 🔐 Autenticación y Seguridad
+
+- JWT tokens almacenados en localStorage
+- Interceptor de Axios para agregar token automáticamente
+- Rutas protegidas con ProtectedRoute
+- Redirección automática a login si no autenticado
+- Logout manual y limpieza de sesión
+
+## 🎨 Características de UX
+
+- **Búsqueda en tiempo real** con expansión automática de resultados
+- **Batches colapsables** para mejor organización
+- **Estados visuales** con colores y badges
+- **Confirmaciones** para acciones destructivas
+- **Feedback visual** con alerts de éxito/error
+- **Responsive design** adaptado a diferentes pantallas
+
+## 🔌 API Hooks Principales
+
+### Autenticación
 ```tsx
 const { user, login, logout, isAuthenticated } = useAuth();
 ```
 
-### useWebSocket
+### Batches
 ```tsx
-const { isConnected, lastMessage } = useWebSocket({
-  url: 'ws://localhost:8000/events',
-  onMessage: (event) => {
-    // Handle real-time updates
-  }
-});
+const { data: batches } = useBatches({ account_id, is_active });
+const { data: batch } = useBatch(batchId);
+const updateBatch = useUpdateBatch();
+const toggleStatus = useToggleBatchStatus();
 ```
 
-### React Query Hooks
+### Jobs
 ```tsx
-// Batches
-const { data: batches } = useBatches({ page: 1, limit: 20 });
-const createBatch = useCreateBatch();
-const pauseBatch = usePauseBatch();
-
-// Jobs
-const { data: jobs } = useJobs({ status: 'in_progress' });
-const retryJob = useRetryJob();
-const advancePhone = useAdvancePhone();
+const { data: jobs } = useJobs({ status, batch_id });
+const { data: job } = useJob(jobId);
+const cancelJob = useCancelJob();
 ```
 
-## 🎨 Flujos de Usuario
-
-### 1. Crear Campaña (Wizard)
-1. **Upload**: Drag & drop archivo Excel/CSV
-2. **Mapping**: Mapear columnas a variables del sistema
-3. **Preview**: Validar datos y ver errores
-4. **Configure**: Configurar horario, prioridad, remitente
-5. **Confirm**: Crear batch y redirigir a detalle
-
-### 2. Monitoreo en Tiempo Real
-- Lista de jobs con actualizaciones WebSocket
-- Estados: pending → in_progress → completed/failed
-- Transcripciones y análisis NLP en tiempo real
-- Acciones: retry, advance phone, view details
-
-### 3. Gestión de Contactos
-- Importar contactos adicionales
-- Ver teléfonos múltiples por contacto
-- Buscar y filtrar contactos
-- Exportar listas para análisis
-
-## 🧪 Testing
-
-### Unit Tests
-```bash
-# Componentes individuales
-npm test -- FileUploader.test.tsx
-npm test -- ColumnMapper.test.tsx
-npm test -- useAuth.test.tsx
+### Cuentas
+```tsx
+const { data: accounts } = useAccounts({ status });
+const { data: account } = useAccount(accountId);
+const suspendAccount = useSuspendAccount();
+const activateAccount = useActivateAccount();
 ```
-
-### Integration Tests
-```bash
-# Flujos completos con MSW
-npm test -- WizardFlow.test.tsx
-npm test -- BatchManagement.test.tsx
-```
-
-### E2E Tests (Cypress)
-```bash
-npx cypress open
-```
-
-## 📊 Métricas y Monitoreo
-
-### KPIs Dashboard
-- Campañas activas vs total
-- Llamadas en progreso
-- Tasa de éxito
-- Costo total acumulado
-
-### Gráficos Disponibles
-- Histogram de attempts por job
-- Heatmap de llamadas por hora
-- Pie chart de distribución de teléfonos
-- Success rate por campaña
-
-## 🔐 Seguridad
-
-### Autenticación
-- JWT tokens con refresh automático
-- Roles: admin (full access) / operator (limited)
-- ProtectedRoute para rutas sensibles
-
-### Validaciones
-- Formatos de teléfono E.164
-- Validación de emails
-- Sanitización de transcripciones
-- Rate limiting con backoff automático
 
 ## 🚢 Deployment
 
 ### Build para Producción
 ```bash
 npm run build
+# Los archivos optimizados estarán en dist/
 ```
 
-### Docker (Opcional)
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["npm", "run", "preview"]
-```
+### Vercel (Configurado)
+El proyecto incluye `vercel.json` con la configuración necesaria:
+- Reescritura de rutas para SPA
+- Headers de CORS si necesario
 
-### Variables de Entorno Producción
 ```bash
-VITE_API_BASE=https://api.speechai.com
-VITE_WS_URL=wss://api.speechai.com
-VITE_CALL_POLLING_INTERVAL=10000
+# Deploy a Vercel
+vercel --prod
 ```
 
-## 🐛 Troubleshooting
+### Variables de Entorno en Producción
+```bash
+VITE_API_BASE_URL=https://api.tu-dominio.com
+```
 
-### Problemas Comunes
+## 🐛 Solución de Problemas
 
-**MSW no carga mocks:**
-- Verificar que `worker.start()` se ejecute en development
-- Revisar console para errores de handlers
+### Token Expirado
+- El sistema limpia automáticamente el localStorage
+- Redirige a login cuando detecta 401
 
-**WebSocket desconectado:**
-- Verificar VITE_WS_URL en .env
-- El componente muestra estado de conexión
-- Fallback automático a polling
+### Problemas de CORS
+- Verificar que el backend tenga configurado CORS para el dominio del frontend
+- En desarrollo, el proxy de Vite puede ayudar
 
-**Upload falla:**
-- Verificar formatos soportados (.xlsx, .csv)
-- Tamaño máximo: 10MB (configurable)
-- Headers correctos: `multipart/form-data`
+### Excel no se sube
+- Verificar formato .xlsx o .csv
+- Revisar que las columnas necesarias estén presentes
+- Ver mensajes de error en la consola
 
-**Tokens expirados:**
-- Refresh automático en interceptor
-- Redirección a /login si refresh falla
+## 📊 Estructura de Datos
 
-## 📚 Recursos
+### Batch
+```typescript
+{
+  batch_id: string;
+  name: string;
+  is_active: boolean;
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  pending_jobs: number;
+  created_at: string;
+  call_settings: {
+    max_call_duration: number;
+    ring_timeout: number;
+    max_attempts: number;
+    retry_delay_hours: number;
+    allowed_hours: { start: string; end: string };
+    days_of_week: number[];
+    timezone: string;
+  }
+}
+```
 
-- [React Query docs](https://tanstack.com/query/latest)
-- [React Hook Form](https://react-hook-form.com/)
-- [MSW docs](https://mswjs.io/)
-- [Recharts examples](https://recharts.org/)
+### Job
+```typescript
+{
+  job_id: string;
+  batch_id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  contact: {
+    name: string;
+    phones: string[];
+  };
+  attempts: number;
+  max_attempts: number;
+  fecha_pago_cliente?: string;  // Compromiso de pago
+  monto_pago_cliente?: number;
+  call_result?: {
+    summary: {
+      transcript: string;
+      call_analysis: object;
+      recording_url: string;
+    }
+  };
+}
+```
 
 ## 🤝 Contribuir
 
 1. Fork el proyecto
 2. Crear branch: `git checkout -b feature/nueva-funcionalidad`
-3. Commit cambios: `git commit -am 'Add nueva funcionalidad'`
-4. Push branch: `git push origin feature/nueva-funcionalidad`
+3. Commit cambios: `git commit -m 'Add: nueva funcionalidad'`
+4. Push: `git push origin feature/nueva-funcionalidad`
 5. Crear Pull Request
-
-### Checklist PR
-- [ ] Tests unitarios pasan
-- [ ] ESLint sin errores
-- [ ] Storybook actualizado
-- [ ] README actualizado si necesario
-- [ ] Types de TypeScript correctos
 
 ## 📄 Licencia
 
-MIT License - ver `LICENSE` file para detalles.
+Proyecto privado - Todos los derechos reservados
 
 ---
 
-## 📞 Soporte
-
-Para issues técnicos, crear un issue en GitHub con:
-- Descripción del problema
-- Pasos para reproducir
-- Logs de console/network
-- Versión de Node.js y npm
-- Sistema operativo
-
-**🎯 ¡Proyecto listo para desarrollo! Inicia con `npm run dev` y comienza a crear campañas con IA.** 🚀
+**🎯 Proyecto listo para uso. Inicia con `npm run dev` y comienza a gestionar campañas de IA.** 🚀

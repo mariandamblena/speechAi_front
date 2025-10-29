@@ -278,11 +278,8 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
             <ul className="mt-2 text-sm text-blue-800 list-disc list-inside space-y-1">
               <li>El cliente no confirmó una fecha o monto de pago específico</li>
               <li>La llamada terminó antes de capturar esta información</li>
-              <li>El backend no devolvió estos campos en la respuesta del API</li>
+              <li>El backend aún no ha procesado los datos dinámicos de esta llamada</li>
             </ul>
-            <p className="mt-3 text-xs text-blue-700 font-mono bg-blue-100 p-2 rounded">
-              🔧 Nota técnica: Los campos fecha_pago_cliente y monto_pago_cliente no están incluidos en la respuesta del endpoint GET /jobs
-            </p>
           </div>
         )}
 

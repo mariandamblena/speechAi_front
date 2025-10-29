@@ -28,7 +28,6 @@ export const Layout: React.FC = () => {
     { name: 'Campañas', href: '/batches', icon: Megaphone },
     { name: 'Llamadas', href: '/jobs', icon: Phone },
     { name: 'Reportes', href: '/reports', icon: BarChart3 },
-    { name: 'Test API', href: '/test-api', icon: Code2 },
   ];
 
   return (
@@ -56,6 +55,18 @@ export const Layout: React.FC = () => {
 
             {/* User menu */}
             <div className="flex items-center space-x-4">
+              {/* Test API Button */}
+              <button
+                onClick={() => navigate('/test-api')}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group relative"
+                title="Test API"
+              >
+                <Code2 className="h-5 w-5" />
+                <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  Test API
+                </span>
+              </button>
+
               <div className="flex items-center space-x-2 bg-gray-50 rounded-full px-4 py-2 border border-gray-200">
                 <User className="h-4 w-4 text-gray-600" />
                 <span className="text-sm text-gray-700 font-medium">

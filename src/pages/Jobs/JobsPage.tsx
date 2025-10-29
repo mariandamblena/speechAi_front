@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { useJobs, useBulkDeleteJobs } from '@/services/queries';
+import { useJobs, useBulkDeleteJobs, useBatches } from '@/services/queries';
 import { Button } from '@/components/ui/Button';
 import { JobModel, JobStatus } from '@/types';
 import { JobDetailModal } from '@/components/jobs/JobDetailModal';
-import { Trash2, Filter, X } from 'lucide-react';
+import { Trash2, Filter, X, Search, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const JobsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
@@ -12,11 +12,24 @@ export const JobsPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set());
 
   const { data: jobs, isLoading, error } = useJobs(
     statusFilter === 'all' ? {} : { status: statusFilter }
   );
+  const { data: batches } = useBatches();
   const bulkDeleteMutation = useBulkDeleteJobs();
+
+  // Función para toggle collapse de batch
+  const toggleBatchCollapse = (batchId: string) => {
+    const newCollapsed = new Set(collapsedBatches);
+    if (newCollapsed.has(batchId)) {
+      newCollapsed.delete(batchId);
+    } else {
+      newCollapsed.add(batchId);
+    }
+    setCollapsedBatches(newCollapsed);
+  };
 
   // Filtrar jobs por búsqueda
   const filteredJobs = useMemo(() => {
@@ -32,6 +45,45 @@ export const JobsPage: React.FC = () => {
       return name.includes(query) || phone.includes(query) || batchId.includes(query);
     });
   }, [jobs, searchQuery]);
+
+  // Agrupar jobs por batch
+  const groupedJobs = useMemo(() => {
+    if (!filteredJobs || filteredJobs.length === 0) return new Map();
+    
+    const groups = new Map<string, JobModel[]>();
+    
+    filteredJobs.forEach((job: JobModel) => {
+      const batchId = job.batch_id || 'sin-batch';
+      if (!groups.has(batchId)) {
+        groups.set(batchId, []);
+      }
+      groups.get(batchId)!.push(job);
+    });
+    
+    return groups;
+  }, [filteredJobs]);
+
+  // Colapsar todos los batches al cargar los jobs, pero expandir si hay búsqueda activa
+  React.useEffect(() => {
+    if (groupedJobs.size > 0) {
+      const allBatchIds = Array.from(groupedJobs.keys());
+      
+      // Si hay búsqueda activa, expandir todos los batches
+      if (searchQuery.trim()) {
+        setCollapsedBatches(new Set());
+      } else {
+        // Si no hay búsqueda, colapsar todos
+        setCollapsedBatches(new Set(allBatchIds));
+      }
+    }
+  }, [groupedJobs, searchQuery]);
+
+  // Obtener nombre del batch
+  const getBatchName = (batchId: string) => {
+    if (batchId === 'sin-batch') return 'Sin Lote Asignado';
+    const batch = batches?.find(b => b.batch_id === batchId);
+    return batch?.name || `Lote ${batchId}`;
+  };
 
   const getStatusColor = (status: JobStatus) => {
     switch (status) {
@@ -174,6 +226,18 @@ export const JobsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Buscador fuera del panel de filtros */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar por nombre, teléfono o ID de lote..."
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
       {/* Panel de filtros */}
       {showFilters && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -191,15 +255,9 @@ export const JobsPage: React.FC = () => {
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar
+                Estado
               </label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nombre, teléfono o ID de lote..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <p className="text-xs text-gray-500">Usa los tabs de abajo para filtrar por estado</p>
             </div>
           </div>
         </div>
@@ -229,153 +287,213 @@ export const JobsPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Jobs list */}
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+      {/* Jobs list agrupados por batch */}
+      <div className="space-y-4">
         {!filteredJobs || filteredJobs.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6 text-center text-gray-500">
             {searchQuery ? 'No se encontraron tareas que coincidan con tu búsqueda' : 'No hay tareas que mostrar'}
           </div>
         ) : (
-          <div className="overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectAll}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contacto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Compromiso
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Intentos
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Creado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredJobs.map((job: JobModel) => (
-                  <tr key={job._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedJobIds.has(job._id)}
-                        onChange={() => handleSelectJob(job._id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {job.contact.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Lote: {job.batch_id}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          job.status
-                        )}`}
-                      >
-                        {getStatusText(job.status)}
+          Array.from(groupedJobs.entries()).map(([batchId, batchJobs]) => {
+            const isCollapsed = collapsedBatches.has(batchId);
+            
+            return (
+              <div key={batchId} className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+                {/* Header del batch - Más compacto */}
+                <div 
+                  className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:from-gray-100 hover:to-gray-150 transition-all"
+                  onClick={() => toggleBatchCollapse(batchId)}
+                >
+                  <div className="flex items-center space-x-2">
+                    {isCollapsed ? (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    )}
+                    <div className="flex items-center space-x-3">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        {getBatchName(batchId)}
+                      </h3>
+                      <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                        {batchJobs.length} {batchJobs.length === 1 ? 'llamada' : 'llamadas'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        // 🔧 Extraer variables de compromiso desde collected_dynamic_variables
-                        const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
-                        const fechaPago = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente;
-                        const montoPago = job.monto_pago_cliente || 
-                          (typeof dynamicVars?.monto_pago_cliente === 'string' 
-                            ? parseFloat(dynamicVars.monto_pago_cliente) 
-                            : dynamicVars?.monto_pago_cliente);
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4 text-xs">
+                    <div className="flex items-center space-x-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-gray-600">{batchJobs.filter((j: JobModel) => j.status === 'completed' || j.status === 'done').length}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                      <span className="text-gray-600">{batchJobs.filter((j: JobModel) => j.status === 'pending').length}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                      <span className="text-gray-600">{batchJobs.filter((j: JobModel) => j.status === 'failed').length}</span>
+                    </div>
+                  </div>
+                </div>
 
-                        return fechaPago ? (
-                          <div className="flex flex-col space-y-1">
-                            <div className="flex items-center">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                💰 Sí
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              📅 {new Date(fechaPago).toLocaleDateString('es-ES', { 
-                                month: 'short', 
-                                day: 'numeric' 
-                              })}
-                            </div>
-                            {montoPago && (
-                              <div className="text-xs font-semibold text-green-700">
-                                ${montoPago.toLocaleString('es-CL')}
+                {/* Tabla de jobs del batch */}
+                {!isCollapsed && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left">
+                            <input
+                              type="checkbox"
+                              checked={batchJobs.every((job: JobModel) => selectedJobIds.has(job._id))}
+                              onChange={() => {
+                                const allSelected = batchJobs.every((job: JobModel) => selectedJobIds.has(job._id));
+                                const newSelected = new Set(selectedJobIds);
+                                
+                                if (allSelected) {
+                                  batchJobs.forEach((job: JobModel) => newSelected.delete(job._id));
+                                } else {
+                                  batchJobs.forEach((job: JobModel) => newSelected.add(job._id));
+                                }
+                                
+                                setSelectedJobIds(newSelected);
+                                setSelectAll(newSelected.size === filteredJobs.length);
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Contacto
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estado
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Compromiso
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Intentos
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Creado
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Acciones
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {batchJobs.map((job: JobModel) => (
+                          <tr key={job._id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={selectedJobIds.has(job._id)}
+                                onChange={() => handleSelectJob(job._id)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {job.contact.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {job.contact.phones?.[0] || 'Sin teléfono'}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            —
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${(job.attempts / job.max_attempts) * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="ml-2 text-sm text-gray-500">
-                          {job.attempts}/{job.max_attempts}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(job.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        {job.status === 'in_progress' && (
-                          <Button size="sm" variant="secondary">
-                            Pausar
-                          </Button>
-                        )}
-                        {job.status === 'failed' && (
-                          <Button size="sm" variant="primary">
-                            Reintentar
-                          </Button>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="secondary"
-                          onClick={() => setSelectedJob(job)}
-                        >
-                          Ver Detalle
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                  job.status
+                                )}`}
+                              >
+                                {getStatusText(job.status)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {(() => {
+                                // 🔧 Extraer variables de compromiso desde collected_dynamic_variables
+                                const dynamicVars = job.call_result?.summary?.collected_dynamic_variables;
+                                const fechaPago = job.fecha_pago_cliente || dynamicVars?.fecha_pago_cliente;
+                                const montoPago = job.monto_pago_cliente || 
+                                  (typeof dynamicVars?.monto_pago_cliente === 'string' 
+                                    ? parseFloat(dynamicVars.monto_pago_cliente) 
+                                    : dynamicVars?.monto_pago_cliente);
+
+                                return fechaPago ? (
+                                  <div className="flex flex-col space-y-1">
+                                    <div className="flex items-center">
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        💰 Sí
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                      📅 {new Date(fechaPago).toLocaleDateString('es-ES', { 
+                                        month: 'short', 
+                                        day: 'numeric' 
+                                      })}
+                                    </div>
+                                    {montoPago && (
+                                      <div className="text-xs font-semibold text-green-700">
+                                        ${montoPago.toLocaleString('es-CL')}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                    —
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-600 h-2 rounded-full"
+                                    style={{ width: `${(job.attempts / job.max_attempts) * 100}%` }}
+                                  ></div>
+                                </div>
+                                <span className="ml-2 text-sm text-gray-500">
+                                  {job.attempts}/{job.max_attempts}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(job.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                {job.status === 'in_progress' && (
+                                  <Button size="sm" variant="secondary">
+                                    Pausar
+                                  </Button>
+                                )}
+                                {job.status === 'failed' && (
+                                  <Button size="sm" variant="primary">
+                                    Reintentar
+                                  </Button>
+                                )}
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary"
+                                  onClick={() => setSelectedJob(job)}
+                                >
+                                  Ver Detalle
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 

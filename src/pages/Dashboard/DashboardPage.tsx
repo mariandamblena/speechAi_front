@@ -19,6 +19,23 @@ export const DashboardPage: React.FC = () => {
   const { data: batches, isLoading: batchesLoading } = useBatches({});
   const { data: jobs, isLoading: jobsLoading } = useJobs({});
 
+  // Función para traducir estados a español
+  const getStatusText = (batch: any) => {
+    if (batch.is_active === true) {
+      return 'Activa';
+    } else {
+      return 'Pausada';
+    }
+  };
+
+  const getStatusColor = (batch: any) => {
+    if (batch.is_active === true) {
+      return 'bg-green-100 text-green-800';
+    } else {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
   // Calcular estadísticas reales desde los jobs
   const stats = useMemo(() => {
     if (!jobs || !Array.isArray(jobs)) {
@@ -34,29 +51,32 @@ export const DashboardPage: React.FC = () => {
       };
     }
 
-    const today = new Date().toDateString();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     const jobsToday = jobs.filter(job => {
-      const jobDate = new Date(job.created_at).toDateString();
-      return jobDate === today;
+      const jobDate = new Date(job.created_at);
+      jobDate.setHours(0, 0, 0, 0);
+      return jobDate.getTime() === today.getTime();
     });
 
-    const completed = jobs.filter(j => j.status === 'completed' || j.status === 'done').length;
-    const failed = jobs.filter(j => j.status === 'failed').length;
-    const pending = jobs.filter(j => j.status === 'pending').length;
-    const inProgress = jobs.filter(j => j.status === 'in_progress').length;
+    const completedToday = jobsToday.filter(j => j.status === 'completed' || j.status === 'done').length;
+    const failedToday = jobsToday.filter(j => j.status === 'failed').length;
+    const pendingToday = jobsToday.filter(j => j.status === 'pending').length;
+    const inProgressToday = jobsToday.filter(j => j.status === 'in_progress').length;
     
-    const successRate = jobs.length > 0 ? (completed / jobs.length) * 100 : 0;
-    const totalCost = jobs.reduce((sum, job) => sum + (job.call_cost || 0), 0);
+    const successRate = jobsToday.length > 0 ? (completedToday / jobsToday.length) * 100 : 0;
+    const totalCostToday = jobsToday.reduce((sum, job) => sum + (job.call_result?.summary?.call_cost?.combined_cost || 0), 0);
 
     return {
       total_jobs_today: jobsToday.length,
       success_rate: successRate,
-      active_batches: Array.isArray(batches) ? batches.filter((b: any) => b.is_active).length : 0,
-      pending_jobs: pending,
-      completed_jobs_today: completed,
-      failed_jobs_today: failed,
-      in_progress_jobs: inProgress,
-      revenue_today: totalCost
+      active_batches: Array.isArray(batches) ? batches.filter((b: any) => b.is_active === true).length : 0,
+      pending_jobs: pendingToday,
+      completed_jobs_today: completedToday,
+      failed_jobs_today: failedToday,
+      in_progress_jobs: inProgressToday,
+      revenue_today: totalCostToday
     };
   }, [jobs, batches]);
 
@@ -157,18 +177,14 @@ export const DashboardPage: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-900">{batch.name}</p>
                       <p className="text-sm text-gray-500">
-                        {batch.stats?.total_contacts || 0} contactos • {batch.status}
+                        {batch.total_jobs || 0} contactos
                       </p>
                     </div>
                     <div className="flex items-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        batch.status === 'RUNNING' 
-                          ? 'bg-green-100 text-green-800'
-                          : batch.status === 'PAUSED'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
+                        getStatusColor(batch)
                       }`}>
-                        {batch.status}
+                        {getStatusText(batch)}
                       </span>
                     </div>
                   </div>
