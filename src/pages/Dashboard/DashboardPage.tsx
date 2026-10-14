@@ -1,3 +1,4 @@
+import { getCallCostUsd } from '@/utils/retell';
 import React, { useMemo } from 'react';
 import { useBatches, useJobs } from '@/services/queries';
 import { formatNumber } from '@/utils/format';
@@ -65,8 +66,9 @@ export const DashboardPage: React.FC = () => {
     const pendingToday = jobsToday.filter(j => j.status === 'pending').length;
     const inProgressToday = jobsToday.filter(j => j.status === 'in_progress').length;
     
-    const successRate = jobsToday.length > 0 ? (completedToday / jobsToday.length) * 100 : 0;
-    const totalCostToday = jobsToday.reduce((sum, job) => sum + (job.call_result?.summary?.call_cost?.combined_cost || 0), 0);
+    const successfulToday = jobsToday.filter(j => j.call_result?.success === true).length;
+    const successRate = jobsToday.length > 0 ? (successfulToday / jobsToday.length) * 100 : 0;
+    const totalCostToday = jobsToday.reduce((sum, job) => sum + getCallCostUsd({ call_result: job.call_result }), 0);
 
     return {
       total_jobs_today: jobsToday.length,

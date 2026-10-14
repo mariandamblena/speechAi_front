@@ -100,7 +100,8 @@ export interface JobModel {
   monto_pago_cliente?: number; // Monto que el cliente promete pagar
   
   call_result?: {
-    success: boolean;
+    success: boolean | null;
+    analysis_pending?: boolean;
     status: string;
     summary?: {
       call_status: string;
@@ -113,7 +114,9 @@ export interface JobModel {
       call_analysis?: {
         call_summary: string;
         user_sentiment: string;
-        call_successful: boolean;
+        call_successful?: boolean;
+        in_voicemail?: boolean;
+        custom_analysis_data?: Record<string, unknown>;
       };
       recording_url?: string;
       public_log_url?: string;

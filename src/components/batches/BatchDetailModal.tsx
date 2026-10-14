@@ -1,3 +1,4 @@
+import { getCallCostUsd } from '@/utils/retell';
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -313,7 +314,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
         tipoPago,
         job.call_result?.success ? 'Sí' : 'No',
         job.call_result?.summary?.call_status || 'N/A',
-        job.call_result?.summary?.call_cost?.combined_cost || job.estimated_cost || 0,
+        getCallCostUsd(job),
         (job.call_result?.summary?.call_analysis?.call_summary || '').replace(/\n/g, ' ').replace(/"/g, '""'),
         job.call_result?.summary?.recording_url || '',
         job.call_result?.summary?.public_log_url || ''

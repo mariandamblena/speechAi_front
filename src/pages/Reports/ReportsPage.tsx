@@ -1,3 +1,4 @@
+import { getCallCostUsd } from '@/utils/retell';
 import React, { useState, useMemo } from 'react';
 import { useDashboardStats, useBatches, useJobs } from '@/services/queries';
 import { Button } from '@/components/ui/Button';
@@ -87,7 +88,7 @@ export const ReportsPage: React.FC = () => {
         'Faltante': faltante.toFixed(2),
         'Fecha Compromiso': job.fecha_pago_cliente || 'N/A',
         'Duración (seg)': job.call_duration_seconds || 0,
-        'Costo': (job.call_result?.summary?.call_cost?.combined_cost || 0).toFixed(4),
+        'Costo': getCallCostUsd({ call_result: job.call_result }).toFixed(4),
         'Intentos': job.attempts || 0,
         'Fecha Creación': job.created_at ? new Date(job.created_at).toLocaleString('es-CL') : 'N/A',
         'Fecha Inicio': job.call_started_at ? new Date(job.call_started_at).toLocaleString('es-CL') : 'N/A',
@@ -193,7 +194,7 @@ export const ReportsPage: React.FC = () => {
 
     const totalCalls = jobs.length;
     const successfulCalls = jobs.filter(
-      (job: any) => job.status === 'completed' || job.status === 'done'
+      (job: any) => job.call_result?.success === true
     ).length;
     const failedCalls = jobs.filter((job: any) => job.status === 'failed').length;
 

@@ -1,3 +1,4 @@
+import { getCallCostUsd } from '@/utils/retell';
 import React from 'react';
 import { JobModel } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -150,7 +151,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
                 <div>
                   <span className="font-medium text-gray-700">Éxito:</span>
                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                    job.call_result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    job.call_result.success == null ? 'bg-yellow-100 text-yellow-800' : job.call_result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {job.call_result.success ? 'Sí' : 'No'}
                   </span>
@@ -164,13 +165,13 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
                     <div>
                       <span className="font-medium text-gray-700">Duración:</span>
                       <span className="ml-2 text-gray-900">
-                        {job.call_result.summary.call_cost?.total_duration_seconds || 0} segundos
+                        {(job.call_result.summary.duration_ms ?? 0) / 1000} segundos
                       </span>
                     </div>
                     <div>
                       <span className="font-medium text-gray-700">Costo:</span>
                       <span className="ml-2 text-gray-900">
-                        ${job.call_result.summary.call_cost?.combined_cost || 0}
+                        ${getCallCostUsd(job).toFixed(4)} USD
                       </span>
                     </div>
                     {job.call_result.summary.call_analysis?.call_summary && (
